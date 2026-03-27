@@ -1,0 +1,10 @@
+# Ignore test binaries but not the .f sources
+test*
+!test*.f
+
+# Miscellaneous test outputs
+lsst_wcs.asdf
+nativetest.yaml
+sm.txt
+tanSipWcs.asdf
+yamltest.asdf
