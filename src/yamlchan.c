@@ -416,6 +416,8 @@ static AstKeyMap *WriteTranMap( AstYamlChan *, AstTranMap *, AstObject *, const 
 static AstKeyMap *WriteUnitMap( AstYamlChan *, AstUnitMap *, AstObject *, const char *, int *);
 static AstKeyMap *WriteWcsMap( AstYamlChan *, AstWcsMap *, AstObject *, const char *,  int *);
 static AstKeyMap *WriteWinMap( AstYamlChan *, AstWinMap *, AstObject *, const char *, int *);
+static AstKeyMap *WriteAsdfSphericalCartesian( AstYamlChan *, int, AstObject *, const char *, int *);
+static AstKeyMap *WriteSphMap( AstYamlChan *, AstSphMap *, AstObject *, const char *, int *);
 static AstKeyMap *WriteZoomMap( AstYamlChan *, AstZoomMap *, AstObject *, const char *,  int *);
 static AstKeyMap* WriteCmpMap( AstYamlChan *, AstCmpMap *, AstObject *, const char *, int *);
 static AstMapping *IsPolyMap( AstMapping *, int * );
@@ -458,6 +460,7 @@ static double GetQuantity( AstKeyMap *, const char *, const char *, int, double,
 static double GetTime( AstKeyMap *, const char *, AstFrame *, int * );
 static int FindAffine( int, int *, AstMapping **, int *, int * );
 static int FindRotate3d( int, int *, AstMapping **, int *, int * );
+static int FindSphericalCartesian( int, int *, AstMapping **, int *, int * );
 static int Get0I( AstKeyMap *, const char *, int, int, int * );
 static int Get1A( AstKeyMap *, const char *, int, int, AstKeyMap **, int *, int * );
 static int Get1D( AstKeyMap *, const char *, int, int, double *, int *, int * );
@@ -2417,7 +2420,7 @@ static int FindRotate3d( int series, int *nmap, AstMapping **map_list,
 *     element of the list. Each such element will be a CmpMap and its proxy
 *     pointer will point to a KeyMap containing the properties of the
 *     equivalent ASDF rotate3d (the KeyMap will have a single entry named
-*     "ANGLES" containig the three Euler angles).
+*     "ANGLES" containing the three Euler angles).
 *
 *     A matching sequence must look like [SphMap,3x3 MatrixMap,SphMap]. Any
 *     such sequence that represents a spherical rotation is removed from
@@ -2594,6 +2597,148 @@ static int FindRotate3d( int series, int *nmap, AstMapping **map_list,
    }
 
 /* Return the Mapping */
+   return result;
+}
+
+static int FindSphericalCartesian( int series, int *nmap, AstMapping **map_list,
+                                   int *invert_list, int *status ){
+/*
+*  Name:
+*     FindSphericalCartesian
+
+*  Purpose:
+*     Search a list of Mappings for a sequence corresponding to an ASDF
+*     gwcs/spherical_cartesian transform.
+
+*  Type:
+*     Private function.
+
+*  Synopsis:
+*     #include "yamlchan.h"
+*     int FindSphericalCartesian( int series, int *nmap, AstMapping **map_list,
+*                                 int *invert_list, int *status )
+
+*  Class Membership:
+*     YamlChan member function
+
+*  Description:
+*     This function searches the supplied list of Mappings for sequences
+*     that correspond to a gwcs/spherical_cartesian. If no matching
+*     sequence is found, 0 is returned and the list is left unchanged.
+*     If one or more matching sequences are found, 1 is returned and the
+*     list is changed so that each whole sequence is contained in a single
+*     element. Each such element is a CmpMap with its proxy pointer set
+*     to a KeyMap with a "SPHERICAL_TO_CARTESIAN" integer entry.
+*
+*     Two patterns are recognised:
+*     - spherical_to_cartesian: ZoomMap(Nin=2, Zoom=DD2R, not inverted)
+*       followed by SphMap (inverted).
+*     - cartesian_to_spherical: SphMap (not inverted) followed by
+*       ZoomMap(Nout=2, Zoom=DR2D, not inverted).
+
+*  Parameters:
+*     series
+*        If non-zero, the Mappings are applied in series (only series
+*        combinations are checked).
+*     nmap
+*        Address of the number of Mappings in the list, updated on exit.
+*     map_list
+*        Array of Mapping pointers, updated on exit.
+*     invert_list
+*        Array of invert flags, updated on exit.
+*     status
+*        Pointer to the inherited status variable.
+
+*  Returned Value:
+*     Non-zero if a matching sequence was found, zero otherwise.
+
+*/
+
+/* Local Variables: */
+   AstCmpMap *new;
+   AstKeyMap *km;
+   double zoom;
+   int imap;
+   int jmap;
+   int nmaps;
+   int oldinv0;
+   int oldinv1;
+   int result;
+   int s2c;
+
+/* Initialise */
+   result = 0;
+
+/* Check inherited status. Only series combinations make sense. */
+   if( !astOK || !series ) return result;
+
+/* Loop through the Mappings in the list, stopping before the last since
+   we need at least two Mappings for a match. */
+   for( imap = 0; imap < *nmap - 1; imap++ ) {
+      s2c = -1;
+
+/* Check for spherical_to_cartesian: ZoomMap(Nin=2, Zoom~DD2R, !inv)
+   followed by SphMap(inv). */
+      if( astIsAZoomMap( map_list[ imap ] ) && !invert_list[ imap ] &&
+          astIsASphMap( map_list[ imap + 1 ] ) && invert_list[ imap + 1 ] ) {
+         zoom = astGetZoom( map_list[ imap ] );
+         if( astGetNin( map_list[ imap ] ) == 2 &&
+             fabs( zoom - AST__DD2R ) < 1.0E-12 ) {
+            s2c = 1;
+         }
+
+/* Check for cartesian_to_spherical: SphMap(!inv) followed by
+   ZoomMap(Nout=2, Zoom~DR2D, !inv). */
+      } else if( astIsASphMap( map_list[ imap ] ) && !invert_list[ imap ] &&
+                 astIsAZoomMap( map_list[ imap + 1 ] ) && !invert_list[ imap + 1 ] ) {
+         zoom = astGetZoom( map_list[ imap + 1 ] );
+         if( astGetNout( map_list[ imap + 1 ] ) == 2 &&
+             fabs( zoom - AST__DR2D ) < 1.0E-8 ) {
+            s2c = 0;
+         }
+      }
+
+/* If a matching pair was found, package it as a CmpMap with a proxy KeyMap. */
+      if( s2c >= 0 ) {
+         km = astKeyMap( " ", status );
+         astMapPut0I( km, "SPHERICAL_TO_CARTESIAN", s2c, NULL );
+
+         oldinv0 = astGetInvert( map_list[ imap ] );
+         oldinv1 = astGetInvert( map_list[ imap + 1 ] );
+         astSetInvert( map_list[ imap ], invert_list[ imap ] );
+         astSetInvert( map_list[ imap + 1 ], invert_list[ imap + 1 ] );
+         new = astCmpMap( map_list[ imap ], map_list[ imap + 1 ], 1, " ", status );
+         astSetInvert( map_list[ imap ], oldinv0 );
+         astSetInvert( map_list[ imap + 1 ], oldinv1 );
+
+         astSetProxy( new, km );
+
+         map_list[ imap ] = astAnnul( map_list[ imap ] );
+         map_list[ imap + 1 ] = astAnnul( map_list[ imap + 1 ] );
+         map_list[ imap ] = (AstMapping *) new;
+
+         imap++;
+         result = 1;
+      }
+   }
+
+/* Compact the list to remove nullified slots. */
+   if( result ) {
+      jmap = 0;
+      for( imap = 0; imap < *nmap; imap++ ) {
+         if( map_list[ imap ] ) {
+            map_list[ jmap ] = map_list[ imap ];
+            invert_list[ jmap++ ] = invert_list[ imap ];
+         }
+      }
+      nmaps = jmap;
+      for( ; jmap < *nmap; jmap++ ) {
+         map_list[ jmap ] = NULL;
+         invert_list[ jmap ] = 0;
+      }
+      *nmap = nmaps;
+   }
+
    return result;
 }
 
@@ -4712,6 +4857,11 @@ static int IsA( AstKeyMap *km, const char *class, int *status ) {
             result = IsAFrame2d( km_class, status );
          } else if( !strcmp( "spherical_cartesian", class ) ){
             result = IsASpherical_Cartesian( km_class, status );
+/* the gwcs/ namespace also defines some transforms that inherit
+   the asdf/transform/transform- so handle that case here; currently the only
+   one supported is also spherical_cartesian */
+         } else if( !strcmp( "transform", class ) ){
+            result = IsASpherical_Cartesian( km_class, status );
          }
 
       } else if( !strncmp( km_class, "asdf/transform/", 15 ) ) {
@@ -5089,6 +5239,12 @@ MAKE_TEST(Baseframe,astropy/coordinates/frames,1,0,
 
 /* Abstract classes with one or more subclasses. */
 
+/* Most supported transforms are defined under the asdf/transform/ namespace;
+   however, the GWCS package defines a few of its own as well, and have names
+   under gwcs/
+
+   Not all the GWCS-specific transforms are supported yet; so far just
+   spherical_cartesian */
 static int IsATransform( const char *class, int *status ){
    return IsAIdentity( class, status ) ||
           IsAScale( class, status ) ||
@@ -5234,6 +5390,7 @@ static AstKeyMap *IsAsdfTransform( AstYamlChan *this, AstCmpMap *map,
    int *invert_list;
    int changed1;
    int changed2;
+   int changed3;
    int imap;
    int nmap;
    int old_inv0;
@@ -5286,7 +5443,9 @@ static AstKeyMap *IsAsdfTransform( AstYamlChan *this, AstCmpMap *map,
                   &nmap, &map_list, &invert_list );
 
 /* Now search the list for sequences that match an equivalent ASDF
-   transform. Currently, the only two we check for are affine and rotate3d.
+   transform. Currently, the we check for affine, rotate3d and
+   spherical_cartesian.
+
    If no matching sequence is found, 0 will be returned and the list will be
    left unchanged. If one or more matching sequences are found, 1 will be
    returned  and the list will be changed so that each whole sequence is
@@ -5295,10 +5454,11 @@ static AstKeyMap *IsAsdfTransform( AstYamlChan *this, AstCmpMap *map,
    properties of the equivalent ASDF transform. */
       changed1 = FindRotate3d( series, &nmap, map_list, invert_list, status );
       changed2 = FindAffine( series, &nmap, map_list, invert_list, status );
+      changed3 = FindSphericalCartesian( series, &nmap, map_list, invert_list, status );
 
 /* If the list was changed, the supplied CmpMap either is, or contains,
    one or more sequences that are equivalent to an ASDF transform. */
-      if( changed1 || changed2  ) {
+      if( changed1 || changed2 || changed3 ) {
 
 /* If the list contains only a single element, it must be a CmpMap that
    is equivalent to an ASDF transform. So write it out. */
@@ -7365,6 +7525,7 @@ static AstFrame *ReadFrame( AstKeyMap *km, int nax, AstMapping **map, int *statu
    int iaxis;
    int mxdim;
    int ndim;
+   int tmp_ndim;
 
 /* Initialise */
    result = NULL;
@@ -7407,30 +7568,28 @@ static AstFrame *ReadFrame( AstKeyMap *km, int nax, AstMapping **map, int *statu
             mxdim = MXDIM;
          }
 
-/* Get the axes_names list (optional). */
+/* Get the axes_names list (optional). Use a temporary ndim so that a
+   missing field does not clobber the count learned from axes_order. */
          axes_names_buffer = Get1C( km, "axes_names", 1, mxdim, axes_names,
-                                    &ndim, status );
+                                    &tmp_ndim, status );
          if( axes_names_buffer ) {
+            ndim = tmp_ndim;
             mxdim = -ndim;
-         } else {
-            mxdim = MXDIM;
          }
 
 /* Get the units (optional). */
-         unit_buffer = Get1C( km, "unit", 1, mxdim, unit, &ndim, status );
+         unit_buffer = Get1C( km, "unit", 1, mxdim, unit, &tmp_ndim, status );
          if( unit_buffer ) {
+            ndim = tmp_ndim;
             mxdim = -ndim;
-         } else {
-            mxdim = MXDIM;
          }
 
 /* Get the axis physical types (optional). */
          axis_physical_types_buffer = Get1C( km, "axis_physical_types", 1, mxdim,
-                                             axis_physical_types, &ndim, status );
+                                             axis_physical_types, &tmp_ndim, status );
          if( axis_physical_types_buffer ) {
+            ndim = tmp_ndim;
             mxdim = -ndim;
-         } else {
-            mxdim = MXDIM;
          }
 
 
@@ -15082,6 +15241,9 @@ static AstKeyMap *WriteMapping( AstYamlChan *this, AstMapping *map,
 
    } else if( astIsAWcsMap( map ) ) {
       ret = WriteWcsMap( this, (AstWcsMap *) map, mapinv, name, status );
+
+   } else if( astIsASphMap( map ) ) {
+      ret = WriteSphMap( this, (AstSphMap *) map, mapinv, name, status );
    }
 
 /* Annul the returned object if an error occurred. */
@@ -15671,6 +15833,7 @@ static AstKeyMap *WriteProxy( AstYamlChan *this, AstMapping *map, AstObject *map
    double shift[ 2 ];
    double matrix[ 4 ];
    int nval;
+   int s2c;
    AstKeyMap *ret;
    void *proxy;
 
@@ -15707,6 +15870,14 @@ static AstKeyMap *WriteProxy( AstYamlChan *this, AstMapping *map, AstObject *map
          ret = WriteAsdfAffine( this, 2, matrix, shift, mapinv,
                                 GetName( this, name, (AstMapping *) map,
                                          status ), status );
+
+/* If the proxy KeyMap contains a "SPHERICAL_TO_CARTESIAN" entry, as
+   created by FindSphericalCartesian, write an ASDF spherical_cartesian. */
+      } else if( astMapGet0I( km, "SPHERICAL_TO_CARTESIAN", &s2c ) ) {
+         ret = WriteAsdfSphericalCartesian( this, s2c, mapinv,
+                                           GetName( this, name,
+                                                    (AstMapping *) map,
+                                                    status ), status );
       }
 
 /* Annull the KeyMap and reset the proxy pointer to NULL. */
@@ -17574,6 +17745,159 @@ static void WriteString( AstChannel *this_channel, const char *name, int set,
          this->write_isa = 1;
       }
    }
+}
+
+static AstKeyMap *WriteAsdfSphericalCartesian( AstYamlChan *this,
+                                               int spherical_to_cartesian,
+                                               AstObject *mapinv,
+                                               const char *name,
+                                               int *status ) {
+/*
+*  Name:
+*     WriteAsdfSphericalCartesian
+
+*  Purpose:
+*     Write an ASDF gwcs/spherical_cartesian object to a KeyMap.
+
+*  Type:
+*     Private function.
+
+*  Synopsis:
+*     #include "yamlchan.h"
+*     AstKeyMap *WriteAsdfSphericalCartesian( AstYamlChan *this,
+*                                             int spherical_to_cartesian,
+*                                             AstObject *mapinv,
+*                                             const char *name,
+*                                             int *status )
+
+*  Class Membership:
+*     YamlChan member function
+
+*  Description:
+*     This function creates a KeyMap holding the ASDF properties of a
+*     gwcs/spherical_cartesian-1.3.0 transform object.
+
+*  Parameters:
+*     this
+*        Pointer to the YamlChan.
+*     spherical_to_cartesian
+*        If non-zero, the transform converts spherical (lon,lat) in degrees
+*        to Cartesian (x,y,z). If zero, converts Cartesian to spherical.
+*     mapinv
+*        Optional custom inverse Mapping, or NULL.
+*     name
+*        Optional name string for the transform, or NULL.
+*     status
+*        Pointer to the inherited status variable.
+
+*  Returned Value:
+*     A new KeyMap holding the ASDF transform properties, or NULL on error.
+
+*/
+
+/* Local Variables: */
+   AstKeyMap *ret;
+
+/* Initialise */
+   ret = NULL;
+
+/* Check the global error status. */
+   if( !astOK ) return ret;
+
+/* Create the returned KeyMap with the gwcs/spherical_cartesian tag. */
+   ret = StartAsdfTransform( this, mapinv, name,
+                             "gwcs/spherical_cartesian-1.3.0", status );
+
+/* Write the transform direction. */
+   Store0C( this, "transform_type", 0, ret,
+            spherical_to_cartesian ? "spherical_to_cartesian"
+                                   : "cartesian_to_spherical",
+            NULL, status );
+
+/* Annul the returned object if an error occurred. */
+   if( !astOK ) ret = astAnnul( ret );
+
+/* Return the answer. */
+   return ret;
+}
+
+static AstKeyMap *WriteSphMap( AstYamlChan *this, AstSphMap *map,
+                               AstObject *mapinv, const char *name,
+                               int *status ) {
+/*
+*  Name:
+*     WriteSphMap
+
+*  Purpose:
+*     Write an AST SphMap to a KeyMap as an ASDF gwcs/spherical_cartesian.
+
+*  Type:
+*     Private function.
+
+*  Synopsis:
+*     #include "yamlchan.h"
+*     AstKeyMap *WriteSphMap( AstYamlChan *this, AstSphMap *map,
+*                             AstObject *mapinv, const char *name,
+*                             int *status )
+
+*  Class Membership:
+*     YamlChan member function
+
+*  Description:
+*     This function converts an AST SphMap to an ASDF
+*     gwcs/spherical_cartesian-1.3.0 transform. The SphMap's forward
+*     direction (Cartesian to spherical, in radians) corresponds to the
+*     ASDF cartesian_to_spherical direction. If the SphMap is inverted,
+*     the spherical_to_cartesian direction is used instead.
+*
+*     Note: the ASDF spherical_cartesian schema uses degrees for the
+*     spherical coordinates, whereas the AST SphMap uses radians. Callers
+*     that need exact degree convention compliance should use the
+*     ZoomMap+SphMap pattern detected by FindSphericalCartesian.
+
+*  Parameters:
+*     this
+*        Pointer to the YamlChan.
+*     map
+*        Pointer to the SphMap that is to be written.
+*     mapinv
+*        Optional custom inverse Mapping, or NULL.
+*     name
+*        Optional name string, or NULL.
+*     status
+*        Pointer to the inherited status variable.
+
+*  Returned Value:
+*     The KeyMap holding the ASDF properties, or NULL on error.
+
+*/
+
+/* Local Variables: */
+   AstKeyMap *ret;
+   int spherical_to_cartesian;
+
+/* Initialise */
+   ret = NULL;
+
+/* Check the global error status. */
+   if( !astOK ) return ret;
+
+/* The AST SphMap forward direction converts Cartesian (x,y,z) to
+   spherical (lon,lat) in radians, which corresponds to cartesian_to_spherical.
+   If the SphMap is inverted, the effective forward direction is
+   spherical_to_cartesian. */
+   spherical_to_cartesian = astGetInvert( map );
+
+   ret = WriteAsdfSphericalCartesian( this, spherical_to_cartesian, mapinv,
+                                      GetName( this, name, (AstMapping *) map,
+                                               status ),
+                                      status );
+
+/* Annul the returned object if an error occurred. */
+   if( !astOK ) ret = astAnnul( ret );
+
+/* Return the answer. */
+   return ret;
 }
 
 static AstKeyMap *WriteZoomMap( AstYamlChan *this, AstZoomMap *map,
