@@ -7599,8 +7599,9 @@ static AstFrame *ReadFrame( AstKeyMap *km, int nax, AstMapping **map, int *statu
             ndim = nax;
 
 /* If the number of axes in the frame is known, report an error if it is
-   not the expected value. */
-         } else if( ndim != nax && astOK ) {
+   not the expected value. When nax==0 (last WCS step, no transform),
+   the expected count is unknown so skip the check. */
+         } else if( ndim != nax && nax > 0 && astOK ) {
             if( name ) {
                astError( AST__BASDF, "astRead(YamlChan): The number of "
                          "axes in the ASDF '%s' frame (%d) is wrong - "
