@@ -45,10 +45,8 @@
 #include "wcsmath.h"
 #include "wcstrig.h"
 
-double astCosd(angle)
-
-const double angle;
-
+double
+astCosd(const double angle)
 {
    double resid;
 
@@ -68,10 +66,8 @@ const double angle;
 
 /*--------------------------------------------------------------------------*/
 
-double astSind(angle)
-
-const double angle;
-
+double
+astSind(const double angle)
 {
    double resid;
 
@@ -91,10 +87,8 @@ const double angle;
 
 /*--------------------------------------------------------------------------*/
 
-double astTand(angle)
-
-const double angle;
-
+double
+astTand(const double angle)
 {
    double resid;
 
@@ -112,10 +106,8 @@ const double angle;
 
 /*--------------------------------------------------------------------------*/
 
-double astACosd(v)
-
-const double v;
-
+double
+astACosd(const double v)
 {
    if (v >= 1.0) {
       if (v-1.0 <  WCSTRIG_TOL) return 0.0;
@@ -130,10 +122,8 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astASind(v)
-
-const double v;
-
+double
+astASind(const double v)
 {
    if (v <= -1.0) {
       if (v+1.0 > -WCSTRIG_TOL) return -90.0;
@@ -148,10 +138,8 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astATand(v)
-
-const double v;
-
+double
+astATand(const double v)
 {
    if (v == -1.0) {
       return -45.0;
@@ -166,10 +154,8 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astATan2d(y, x)
-
-const double x, y;
-
+double
+astATan2d(const double y, const double x)
 {
    if (y == 0.0) {
       if (x >= 0.0) {
