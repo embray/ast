@@ -1,4 +1,7 @@
 # Ignore test binaries but not the .f sources
+*.log
+*.trs
+ast_test
 test*
 !test*.f
 
