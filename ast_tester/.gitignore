@@ -2,7 +2,9 @@
 *.log
 *.trs
 ast_test
+simplify
 test*
+wcsconverter
 !test*.f
 !test*.sh
 
