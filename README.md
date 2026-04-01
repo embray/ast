@@ -65,6 +65,7 @@ The CMake build does not require any Starlink infrastructure.
 - Perl (for generating the `ast.h` public header)
 - Optional: libyaml (for YAML channel support)
 - Optional: pthreads (for thread safety)
+- Optional: a Fortran compiler (for Fortran wrappers, requires `AST_BUILD_FORTRAN=ON`)
 
 ### Build
 
@@ -81,6 +82,7 @@ cmake --install build --prefix /usr/local
 |--------|---------|-------------|
 | `BUILD_SHARED_LIBS` | `ON` | Build shared libraries |
 | `BUILD_TESTING` | `ON` | Build the test program |
+| `AST_BUILD_FORTRAN` | `OFF` | Build Fortran wrappers (requires a Fortran compiler) |
 | `AST_WITH_PTHREADS` | `ON` | Enable POSIX thread support |
 | `AST_WITH_YAML` | `ON` | Enable YAML channel support |
 | `AST_WITH_EXTERNAL_PAL` | `OFF` | Use system PAL/ERFA instead of bundled |

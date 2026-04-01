@@ -14,6 +14,17 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         build_type: [Release]
         shared_libs: [ON, OFF]
+        fortran: [OFF]
+        include:
+          # Add a Fortran build on each platform (shared only)
+          - os: ubuntu-latest
+            build_type: Release
+            shared_libs: ON
+            fortran: ON
+          - os: macos-latest
+            build_type: Release
+            shared_libs: ON
+            fortran: ON
 
     runs-on: ${{ matrix.os }}
 
@@ -24,17 +35,18 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libyaml-dev
+          sudo apt-get install -y libyaml-dev gfortran
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install libyaml
+        run: brew install libyaml gcc
 
       - name: Configure
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DBUILD_SHARED_LIBS=${{ matrix.shared_libs }}
+          -DAST_BUILD_FORTRAN=${{ matrix.fortran }}
 
       - name: Build
         run: cmake --build build --parallel

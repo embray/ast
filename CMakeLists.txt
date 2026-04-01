@@ -7,6 +7,9 @@ project(ast
     DESCRIPTION "AST - World Coordinate Systems Library"
 )
 
+# Fortran is enabled conditionally after option() declarations below,
+# because enable_language(Fortran) must come after project().
+
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckTypeSize)
@@ -80,6 +83,65 @@ check_c_source_compiles("
 " SSCANF_IS_ANSI)
 if(NOT SSCANF_IS_ANSI)
     set(HAVE_NONANSI_SSCANF 1)
+endif()
+
+# ============================================================
+# Optional Fortran interface
+# ============================================================
+if(AST_BUILD_FORTRAN)
+    # If no Fortran compiler is set, try to find gfortran or a versioned
+    # gfortran-NN (e.g. from Homebrew on macOS which does not create an
+    # unversioned symlink). Pick the newest version available.
+    if(NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC})
+        find_program(_FC_PLAIN gfortran)
+        if(_FC_PLAIN)
+            set(CMAKE_Fortran_COMPILER "${_FC_PLAIN}")
+        else()
+            # Search PATH for versioned gfortran-NN (e.g. Homebrew, conda).
+            # Try versions from newest to oldest.
+            foreach(_ver RANGE 20 8 -1)
+                find_program(_FC_VERSIONED gfortran-${_ver})
+                if(_FC_VERSIONED)
+                    set(CMAKE_Fortran_COMPILER "${_FC_VERSIONED}")
+                    message(STATUS "No plain gfortran found; using gfortran-${_ver}")
+                    break()
+                endif()
+                unset(_FC_VERSIONED CACHE)
+            endforeach()
+        endif()
+    endif()
+
+    enable_language(Fortran)
+
+    # Determine the type for trailing Fortran string lengths (TRAIL_TYPE).
+    # gfortran 8+ on 64-bit platforms passes hidden string lengths as
+    # size_t rather than int. Other compilers use int.
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU"
+       AND CMAKE_SIZEOF_VOID_P EQUAL 8
+       AND CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 8)
+        set(TRAIL_TYPE "size_t")
+    else()
+        set(TRAIL_TYPE "int")
+    endif()
+
+    # Check if Fortran compiler is f2c-compatible (affects REAL function return).
+    # Non-f2c compilers (i.e. nearly all modern compilers) return float.
+    set(REAL_FUNCTION_TYPE "float")
+
+    # Determine the blank common symbol. gfortran 4+ uses __BLNK__,
+    # other compilers typically use _BLNK__.
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        set(BLANK_COMMON_SYMBOL "__BLNK__")
+    else()
+        set(BLANK_COMMON_SYMBOL "_BLNK__")
+    endif()
+
+    # Generate f77.h from f77.h.in
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/f77.h.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/src/f77.h"
+        @ONLY
+    )
 endif()
 
 # ============================================================
@@ -299,6 +361,34 @@ add_custom_command(
 add_custom_target(ast_header DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ast.h")
 
 # ============================================================
+# Fortran support: astbad utility and AST_PAR generation
+# ============================================================
+if(AST_BUILD_FORTRAN)
+    # Build the astbad utility (generates Fortran constants at build time)
+    add_executable(astbad src/astbad.c)
+    target_include_directories(astbad PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_BINARY_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}/src"
+    )
+    target_compile_definitions(astbad PRIVATE HAVE_CONFIG_H)
+
+    # Generate AST_PAR from ast_par.source using astbad
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/AST_PAR"
+        COMMAND ${CMAKE_COMMAND}
+            -DASTBAD=$<TARGET_FILE:astbad>
+            -DINPUT="${CMAKE_CURRENT_SOURCE_DIR}/ast_par.source"
+            -DOUTPUT="${CMAKE_CURRENT_BINARY_DIR}/AST_PAR"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_par.cmake"
+        DEPENDS astbad "${CMAKE_CURRENT_SOURCE_DIR}/ast_par.source"
+                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_par.cmake"
+        COMMENT "Generating AST_PAR Fortran include file"
+    )
+    add_custom_target(ast_par DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/AST_PAR")
+endif()
+
+# ============================================================
 # Internal PAL/ERFA library (via palwrap.c which #includes all sources)
 # ============================================================
 if(NOT AST_WITH_EXTERNAL_PAL)
@@ -416,8 +506,85 @@ set(AST_SOURCES
     wcslib/wcstrig.c
 )
 
+# Fortran wrapper sources (C files that provide F77 interface)
+if(AST_BUILD_FORTRAN)
+    set(AST_FORTRAN_SOURCES
+        src/c2f77.c
+        src/fbox.c
+        src/fchannel.c
+        src/fchebymap.c
+        src/fcircle.c
+        src/fcmpframe.c
+        src/fcmpmap.c
+        src/fcmpregion.c
+        src/fdsbspecframe.c
+        src/fdssmap.c
+        src/fellipse.c
+        src/ferror.c
+        src/ffitschan.c
+        src/ffitstable.c
+        src/ffluxframe.c
+        src/fframe.c
+        src/fframeset.c
+        src/fgrismmap.c
+        src/finterval.c
+        src/fintramap.c
+        src/fkeymap.c
+        src/flutmap.c
+        src/fmapping.c
+        src/fmathmap.c
+        src/fmatrixmap.c
+        src/fmoc.c
+        src/fmocchan.c
+        src/fnormmap.c
+        src/fnullregion.c
+        src/fobject.c
+        src/fpcdmap.c
+        src/fpermmap.c
+        src/fplot.c
+        src/fplot3d.c
+        src/fpointlist.c
+        src/fpolygon.c
+        src/fpolymap.c
+        src/fprism.c
+        src/fratemap.c
+        src/fregion.c
+        src/fselectormap.c
+        src/fshiftmap.c
+        src/fskyframe.c
+        src/fslamap.c
+        src/fspecfluxframe.c
+        src/fspecframe.c
+        src/fspecmap.c
+        src/fsphmap.c
+        src/fsplinemap.c
+        src/fstc.c
+        src/fstccatalogentrylocation.c
+        src/fstcobsdatalocation.c
+        src/fstcresourceprofile.c
+        src/fstcschan.c
+        src/fstcsearchlocation.c
+        src/fswitchmap.c
+        src/ftable.c
+        src/ftimeframe.c
+        src/ftimemap.c
+        src/ftranmap.c
+        src/funitmap.c
+        src/funitnormmap.c
+        src/fwcsmap.c
+        src/fwinmap.c
+        src/fxmlchan.c
+        src/fzoommap.c
+        src/fyamlchan.c
+    )
+    list(APPEND AST_SOURCES ${AST_FORTRAN_SOURCES})
+endif()
+
 add_library(ast ${AST_SOURCES})
 add_dependencies(ast ast_header ast_err_h)
+if(AST_BUILD_FORTRAN)
+    add_dependencies(ast ast_par)
+endif()
 
 # Pull in OBJECT libraries
 set(AST_OBJECTS "")
@@ -555,11 +722,19 @@ install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
-install(FILES
+set(AST_INSTALL_HEADERS
     "${CMAKE_CURRENT_BINARY_DIR}/ast.h"
     "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
     src/grf.h
     src/grf3d.h
+)
+if(AST_BUILD_FORTRAN)
+    list(APPEND AST_INSTALL_HEADERS
+        "${CMAKE_CURRENT_BINARY_DIR}/AST_PAR"
+        GRF_PAR
+    )
+endif()
+install(FILES ${AST_INSTALL_HEADERS}
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 
