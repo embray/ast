@@ -1,0 +1,603 @@
+cmake_minimum_required(VERSION 3.14)
+
+# Version is defined to match configure.ac
+project(ast
+    VERSION 9.3.1
+    LANGUAGES C
+    DESCRIPTION "AST - World Coordinate Systems Library"
+)
+
+include(CheckIncludeFile)
+include(CheckFunctionExists)
+include(CheckTypeSize)
+include(CheckCSourceCompiles)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# ============================================================
+# Build options
+# ============================================================
+option(AST_BUILD_FORTRAN "Build with Fortran wrappers" OFF)
+option(AST_WITH_PTHREADS "Build with POSIX threads support" ON)
+option(AST_WITH_YAML "Build with YAML support" ON)
+option(AST_WITH_EXTERNAL_PAL "Use external PAL/ERFA libraries" OFF)
+option(AST_WITH_EXTERNAL_CMINPACK "Use external CMINPACK library" OFF)
+option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+option(BUILD_TESTING "Build the test program" ON)
+
+# ============================================================
+# System checks (replacing autoconf checks)
+# ============================================================
+check_include_file(stdarg.h HAVE_STDARG_H)
+check_include_file(execinfo.h HAVE_EXECINFO_H)
+
+check_function_exists(isnan HAVE_ISNAN)
+check_function_exists(isfinite HAVE_ISFINITE)
+check_function_exists(strerror_r HAVE_STRERROR_R)
+check_function_exists(strtok_r HAVE_STRTOK_R)
+check_function_exists(vsnprintf HAVE_VSNPRINTF)
+check_function_exists(backtrace HAVE_BACKTRACE)
+
+check_type_size("long double" LONG_DOUBLE)
+check_type_size("int64_t" INT64_T)
+check_type_size("uint64_t" UINT64_T)
+check_type_size("long" SIZEOF_LONG)
+check_type_size("long long" SIZEOF_LONG_LONG)
+
+# Check for isnan/isfinite declarations in math.h
+check_c_source_compiles("
+    #include <math.h>
+    int main() { int x = isnan(0.0); return x; }
+" HAVE_DECL_ISNAN)
+
+check_c_source_compiles("
+    #include <math.h>
+    int main() { int x = isfinite(0.0); return x; }
+" HAVE_DECL_ISFINITE)
+
+# Check for __func__ or __FUNCTION__
+check_c_source_compiles("
+    int main() { const char* name = __func__; return 0; }
+" HAVE___FUNC__)
+
+check_c_source_compiles("
+    int main() { const char* name = __FUNCTION__; return 0; }
+" HAVE___FUNCTION__)
+
+# Test for the non-ANSI sscanf behaviour
+check_c_source_compiles("
+    #include <stdio.h>
+    #include <stdlib.h>
+    int main() {
+        char foo[] = \" name 1111.1 \";
+        char bar[8];
+        float ff;
+        int nc = 0;
+        sscanf(foo, \" %s %f %n\", bar, &ff, &nc);
+        return (nc != 13) ? 0 : 1;
+    }
+" SSCANF_IS_ANSI)
+if(NOT SSCANF_IS_ANSI)
+    set(HAVE_NONANSI_SSCANF 1)
+endif()
+
+# ============================================================
+# Optional dependencies
+# ============================================================
+
+# pthreads
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+if(AST_WITH_PTHREADS)
+    find_package(Threads)
+    if(TARGET Threads::Threads)
+        set(HAVE_PTHREADS 1)
+    else()
+        set(HAVE_PTHREADS 0)
+        message(STATUS "pthreads not found - building without thread support")
+    endif()
+else()
+    set(HAVE_PTHREADS 0)
+endif()
+
+# YAML
+if(AST_WITH_YAML)
+    find_library(YAML_LIBRARY NAMES yaml)
+    find_path(YAML_INCLUDE_DIR yaml.h)
+    if(YAML_LIBRARY AND YAML_INCLUDE_DIR)
+        set(HAVE_YAML 1)
+        message(STATUS "Found libyaml: ${YAML_LIBRARY}")
+    else()
+        set(HAVE_YAML 0)
+        message(STATUS "libyaml not found - building without YAML support")
+    endif()
+else()
+    set(HAVE_YAML 0)
+endif()
+
+# External PAL
+if(AST_WITH_EXTERNAL_PAL)
+    find_library(PAL_LIBRARY NAMES pal)
+    if(NOT PAL_LIBRARY)
+        message(FATAL_ERROR "External PAL library requested but not found")
+    endif()
+endif()
+
+# External CMINPACK
+if(AST_WITH_EXTERNAL_CMINPACK)
+    find_library(CMINPACK_LIBRARY NAMES cminpack)
+    if(NOT CMINPACK_LIBRARY)
+        message(FATAL_ERROR "External CMINPACK library requested but not found")
+    endif()
+endif()
+
+# ============================================================
+# Generate config.h
+# ============================================================
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+)
+
+# ============================================================
+# Generate version.h from version.h.in
+# ============================================================
+set(PACKAGE_VERSION "${PROJECT_VERSION}")
+set(PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(PACKAGE_VERSION_RELEASE "${PROJECT_VERSION_PATCH}")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/version.h"
+)
+
+# ============================================================
+# Generate ast_err.h from ast_err.msg
+# ============================================================
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
+    COMMAND ${CMAKE_COMMAND}
+        -DINPUT="${CMAKE_CURRENT_SOURCE_DIR}/ast_err.msg"
+        -DOUTPUT="${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_err_h.cmake"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ast_err.msg"
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_err_h.cmake"
+    COMMENT "Generating ast_err.h from ast_err.msg"
+)
+add_custom_target(ast_err_h DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h")
+
+# ============================================================
+# Configure object.h (substitute @THREADS@)
+# ============================================================
+if(HAVE_PTHREADS)
+    set(THREADS "1")
+else()
+    set(THREADS "0")
+endif()
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/object.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/object.h"
+    @ONLY
+)
+
+# ============================================================
+# Generate ast.h via the makeh Perl script
+# ============================================================
+find_program(PERL perl REQUIRED)
+
+# List of header files that contribute to ast.h, in order
+set(AST_H_FILES
+    src/xml.h
+    wcslib/wcstrig.h
+    wcslib/proj.h
+    src/memory.h
+    src/error.h
+    src/globals.h
+    src/unit.h
+    ast_err.h
+    src/version.h
+    src/object.h
+    src/keymap.h
+    src/table.h
+    src/fitstable.h
+    src/pointset.h
+    src/axis.h
+    src/skyaxis.h
+    src/mapping.h
+    src/cmpmap.h
+    src/dssmap.h
+    src/grismmap.h
+    src/intramap.h
+    src/splinemap.h
+    src/lutmap.h
+    src/mathmap.h
+    src/matrixmap.h
+    src/pcdmap.h
+    src/permmap.h
+    src/polymap.h
+    src/chebymap.h
+    src/ratemap.h
+    src/normmap.h
+    src/shiftmap.h
+    src/slamap.h
+    src/specmap.h
+    src/sphmap.h
+    src/timemap.h
+    src/selectormap.h
+    src/switchmap.h
+    src/tranmap.h
+    src/unitmap.h
+    src/unitnormmap.h
+    src/wcsmap.h
+    src/winmap.h
+    src/xphmap.h
+    src/zoommap.h
+    src/frame.h
+    src/cmpframe.h
+    src/specfluxframe.h
+    src/fluxframe.h
+    src/frameset.h
+    src/plot.h
+    src/plot3d.h
+    src/skyframe.h
+    src/specframe.h
+    src/dsbspecframe.h
+    src/region.h
+    src/box.h
+    src/circle.h
+    src/cmpregion.h
+    src/ellipse.h
+    src/interval.h
+    src/moc.h
+    src/nullregion.h
+    src/pointlist.h
+    src/polygon.h
+    src/prism.h
+    src/stc.h
+    src/stcresourceprofile.h
+    src/stcsearchlocation.h
+    src/stccatalogentrylocation.h
+    src/stcobsdatalocation.h
+    src/timeframe.h
+    src/channel.h
+    src/yamlchan.h
+    src/fitschan.h
+    src/mocchan.h
+    src/stcschan.h
+    src/xmlchan.h
+)
+
+# Build the list of dependencies for ast.h generation
+set(MAKEH_DEPS
+    "${CMAKE_CURRENT_SOURCE_DIR}/makeh"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_h.sh"
+    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/version.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/object.h"
+)
+foreach(hfile IN LISTS AST_H_FILES)
+    if(NOT "${hfile}" STREQUAL "ast_err.h"
+       AND NOT "${hfile}" STREQUAL "src/version.h"
+       AND NOT "${hfile}" STREQUAL "src/object.h")
+        list(APPEND MAKEH_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/${hfile}")
+    endif()
+endforeach()
+
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ast.h"
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_h.sh"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}"
+        "${PERL}"
+        "${CMAKE_C_COMPILER}"
+        "${CMAKE_CURRENT_BINARY_DIR}/ast.h"
+        ${AST_H_FILES}
+    DEPENDS ${MAKEH_DEPS}
+    COMMENT "Generating ast.h"
+)
+add_custom_target(ast_header DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ast.h")
+
+# ============================================================
+# Internal PAL/ERFA library (via palwrap.c which #includes all sources)
+# ============================================================
+if(NOT AST_WITH_EXTERNAL_PAL)
+    add_library(ast_pal OBJECT palwrap.c)
+    target_include_directories(ast_pal PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    target_compile_definitions(ast_pal PRIVATE HAVE_CONFIG_H)
+    set_target_properties(ast_pal PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
+# ============================================================
+# Internal CMINPACK library
+# ============================================================
+if(NOT AST_WITH_EXTERNAL_CMINPACK)
+    set(CMINPACK_SOURCES
+        cminpack/lmder1.c
+        cminpack/lmder.c
+        cminpack/dpmpar.c
+        cminpack/enorm.c
+        cminpack/qrfac.c
+        cminpack/lmpar.c
+        cminpack/qrsolv.c
+    )
+    add_library(ast_cminpack OBJECT ${CMINPACK_SOURCES})
+    target_include_directories(ast_cminpack PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/cminpack"
+    )
+    set_target_properties(ast_cminpack PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
+# ============================================================
+# Main AST library sources
+# ============================================================
+set(AST_SOURCES
+    src/yamlchan.c
+    src/axis.c
+    src/box.c
+    src/channel.c
+    src/chebymap.c
+    src/circle.c
+    src/cmpframe.c
+    src/cmpmap.c
+    src/cmpregion.c
+    src/dsbspecframe.c
+    src/dssmap.c
+    src/ellipse.c
+    src/error.c
+    src/fitschan.c
+    src/fitstable.c
+    src/fluxframe.c
+    src/frame.c
+    src/frameset.c
+    src/globals.c
+    src/grismmap.c
+    src/interval.c
+    src/intramap.c
+    src/keymap.c
+    src/loader.c
+    src/lutmap.c
+    src/mapping.c
+    src/mathmap.c
+    src/matrixmap.c
+    src/memory.c
+    src/moc.c
+    src/mocchan.c
+    src/normmap.c
+    src/nullregion.c
+    src/object.c
+    src/pcdmap.c
+    src/permmap.c
+    src/plot.c
+    src/plot3d.c
+    src/pointlist.c
+    src/pointset.c
+    src/polygon.c
+    src/polymap.c
+    src/prism.c
+    src/ratemap.c
+    src/region.c
+    src/selectormap.c
+    src/shiftmap.c
+    src/skyaxis.c
+    src/skyframe.c
+    src/slamap.c
+    src/specfluxframe.c
+    src/specframe.c
+    src/specmap.c
+    src/sphmap.c
+    src/splinemap.c
+    src/stc.c
+    src/stccatalogentrylocation.c
+    src/stcobsdatalocation.c
+    src/stcresourceprofile.c
+    src/stcschan.c
+    src/stcsearchlocation.c
+    src/switchmap.c
+    src/table.c
+    src/timeframe.c
+    src/timemap.c
+    src/tranmap.c
+    src/unit.c
+    src/unitmap.c
+    src/unitnormmap.c
+    src/wcsmap.c
+    src/winmap.c
+    src/xml.c
+    src/xmlchan.c
+    src/xphmap.c
+    src/zoommap.c
+    # WCSLIB sources (compiled directly into libast)
+    wcslib/proj.c
+    wcslib/tpn.c
+    wcslib/wcstrig.c
+)
+
+add_library(ast ${AST_SOURCES})
+add_dependencies(ast ast_header ast_err_h)
+
+# Pull in OBJECT libraries
+set(AST_OBJECTS "")
+if(NOT AST_WITH_EXTERNAL_PAL)
+    list(APPEND AST_OBJECTS $<TARGET_OBJECTS:ast_pal>)
+endif()
+if(NOT AST_WITH_EXTERNAL_CMINPACK)
+    list(APPEND AST_OBJECTS $<TARGET_OBJECTS:ast_cminpack>)
+endif()
+target_sources(ast PRIVATE ${AST_OBJECTS})
+
+target_include_directories(ast
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/wcslib"
+        "${CMAKE_CURRENT_BINARY_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}/src"
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_compile_definitions(ast PRIVATE HAVE_CONFIG_H)
+if(HAVE_PTHREADS)
+    target_compile_definitions(ast PRIVATE THREAD_SAFE)
+endif()
+if(HAVE_YAML)
+    target_compile_definitions(ast PRIVATE YAML)
+endif()
+if(AST_WITH_MEMDEBUG)
+    target_compile_definitions(ast PRIVATE MEM_DEBUG)
+endif()
+
+set_target_properties(ast PROPERTIES
+    VERSION "${PROJECT_VERSION}"
+    SOVERSION "${PROJECT_VERSION_MAJOR}"
+    POSITION_INDEPENDENT_CODE ON
+    C_STANDARD 99
+)
+
+# libast references symbols (astGFlush, astPutErr_, etc.) that are provided
+# by the satellite libraries (ast_err, ast_grf_*). These are intentionally
+# unresolved in libast and resolved at final link time. Allow this.
+if(BUILD_SHARED_LIBS)
+    if(APPLE)
+        target_link_options(ast PRIVATE "-undefined" "dynamic_lookup")
+    endif()
+endif()
+
+# Link dependencies
+target_link_libraries(ast PRIVATE m)
+if(HAVE_PTHREADS)
+    target_link_libraries(ast PRIVATE Threads::Threads)
+endif()
+if(HAVE_YAML)
+    target_link_libraries(ast PRIVATE ${YAML_LIBRARY})
+    target_include_directories(ast PRIVATE ${YAML_INCLUDE_DIR})
+endif()
+if(AST_WITH_EXTERNAL_PAL)
+    target_link_libraries(ast PRIVATE ${PAL_LIBRARY})
+endif()
+if(AST_WITH_EXTERNAL_CMINPACK)
+    target_link_libraries(ast PRIVATE ${CMINPACK_LIBRARY})
+endif()
+
+# ============================================================
+# Satellite libraries: these reference symbols from libast and are
+# designed to be linked alongside it. Build as static libraries
+# with PIC so they can be linked into shared executables.
+# ============================================================
+set(SATELLITE_INCLUDES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/src"
+)
+
+# Null error reporting library (default)
+add_library(ast_err STATIC src/err_null.c)
+target_include_directories(ast_err PRIVATE ${SATELLITE_INCLUDES})
+target_compile_definitions(ast_err PRIVATE HAVE_CONFIG_H)
+set_target_properties(ast_err PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_err ast_err_h)
+
+# ============================================================
+# Null graphics libraries
+# ============================================================
+add_library(ast_grf_2.0 STATIC src/grf_2.0.c)
+target_include_directories(ast_grf_2.0 PRIVATE ${SATELLITE_INCLUDES})
+set_target_properties(ast_grf_2.0 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_grf_2.0 ast_err_h)
+
+add_library(ast_grf_3.2 STATIC src/grf_3.2.c)
+target_include_directories(ast_grf_3.2 PRIVATE ${SATELLITE_INCLUDES})
+set_target_properties(ast_grf_3.2 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_grf_3.2 ast_err_h)
+
+add_library(ast_grf_5.6 STATIC src/grf_5.6.c)
+target_include_directories(ast_grf_5.6 PRIVATE ${SATELLITE_INCLUDES})
+set_target_properties(ast_grf_5.6 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_grf_5.6 ast_err_h)
+
+add_library(ast_grf3d STATIC src/grf3d.c)
+target_include_directories(ast_grf3d PRIVATE ${SATELLITE_INCLUDES})
+set_target_properties(ast_grf3d PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_grf3d ast_err_h)
+
+# ============================================================
+# Test program
+# ============================================================
+if(BUILD_TESTING)
+    enable_testing()
+    add_executable(ast_test ast_test.c)
+    target_link_libraries(ast_test PRIVATE
+        ast
+        ast_grf_2.0
+        ast_grf_3.2
+        ast_grf_5.6
+        ast_grf3d
+        ast_err
+        m
+    )
+    target_include_directories(ast_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    add_test(NAME ast_test COMMAND ast_test)
+endif()
+
+# ============================================================
+# Installation
+# ============================================================
+install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d
+    EXPORT astTargets
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/ast.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
+    src/grf.h
+    src/grf3d.h
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+# ============================================================
+# pkg-config
+# ============================================================
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ast.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ast.pc"
+    @ONLY
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ast.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+)
+
+# ============================================================
+# CMake package config
+# ============================================================
+install(EXPORT astTargets
+    FILE astTargets.cmake
+    NAMESPACE AST::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ast"
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/astConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/astConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ast"
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/astConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/astConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/astConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ast"
+)
