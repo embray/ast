@@ -4,6 +4,7 @@
 ast_test
 test*
 !test*.f
+!test*.sh
 
 # Miscellaneous test outputs
 lsst_wcs.asdf
