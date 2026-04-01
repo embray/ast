@@ -2014,6 +2014,20 @@ platepos (double xpix, double ypix, struct WorldCoor *wcs,
 /* returns 0 if successful otherwise 1 = angle too large for projection; */
 /* based on amdpos() from getimage */
 
+/*
+*  Parameters:
+*     xpix
+*        x pixel number (RA or longitude without rotation).
+*     ypix
+*        y pixel number (Dec or latitude without rotation).
+*     wcs
+*        WCS parameter structure.
+*     xpos
+*        Returned right ascension or longitude in degrees.
+*     ypos
+*        Returned declination or latitude in degrees.
+*/
+
 {
   double x, y, xmm, ymm, xmm2, ymm2, xmm3, ymm3, x2y2;
   double xi, xir, eta, etar, raoff, ra, dec;
@@ -2102,6 +2116,20 @@ platepix (double xpos, double ypos, struct WorldCoor *wcs,
 /* Routine to determine pixel coordinates for sky position */
 /* returns 0 if successful otherwise 1 = angle too large for projection; */
 /* based on amdinv() from getimage */
+
+/*
+*  Parameters:
+*     xpos
+*        Right ascension or longitude in degrees.
+*     ypos
+*        Declination or latitude in degrees.
+*     wcs
+*        WCS parameter structure.
+*     xpix
+*        Returned x pixel number (RA or longitude without rotation).
+*     ypix
+*        Returned y pixel number (Dec or latitude without rotation).
+*/
 
 {
   double div,xi,eta,x,y,xy,x2,y2,x2y,y2x,x3,y3,x4,y4,x2y2,cjunk,dx,dy;
@@ -2264,7 +2292,3 @@ platepix (double xpos, double ypos, struct WorldCoor *wcs,
    Sep  5 1997  Modified by R.F. Warren-Smith (Starlink) to make the
                 platepos and platepix functions static.
  */
-
-
-
-
