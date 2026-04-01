@@ -2002,7 +2002,8 @@ AstFitsChan *astDssFits_( AstDssMap *this, int *status ){
   Changed by R.F. Warren-Smith (Starlink) to make the function static. */
 
 static int
-platepos (xpix, ypix, wcs, xpos, ypos)
+platepos( double xpix, double ypix, struct WorldCoor *wcs,
+          double *xpos, double *ypos )
 
 /* >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> */
 
@@ -2010,14 +2011,19 @@ platepos (xpix, ypix, wcs, xpos, ypos)
 /* returns 0 if successful otherwise 1 = angle too large for projection; */
 /* based on amdpos() from getimage */
 
-/* Input: */
-double	xpix;		/* x pixel number  (RA or long without rotation) */
-double	ypix;		/* y pixel number  (dec or lat without rotation) */
-struct WorldCoor *wcs;	/* WCS parameter structure */
-
-/* Output: */
-double	*xpos;		/* Right ascension or longitude in degrees */
-double	*ypos;		/* Declination or latitude in degrees */
+/*
+*  Parameters:
+*     xpix
+*        x pixel number (RA or longitude without rotation).
+*     ypix
+*        y pixel number (Dec or latitude without rotation).
+*     wcs
+*        WCS parameter structure.
+*     xpos
+*        Returned right ascension or longitude in degrees.
+*     ypos
+*        Returned declination or latitude in degrees.
+*/
 
 {
   double x, y, xmm, ymm, xmm2, ymm2, xmm3, ymm3, x2y2;
@@ -2099,7 +2105,8 @@ double	*ypos;		/* Declination or latitude in degrees */
   Changed by R.F. Warren-Smith (Starlink) to make the function static. */
 
 static int
-platepix (xpos, ypos, wcs, xpix, ypix)
+platepix( double xpos, double ypos, struct WorldCoor *wcs,
+          double *xpix, double *ypix )
 
 /* >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> */
 
@@ -2107,14 +2114,19 @@ platepix (xpos, ypos, wcs, xpix, ypix)
 /* returns 0 if successful otherwise 1 = angle too large for projection; */
 /* based on amdinv() from getimage */
 
-/* Input: */
-double	xpos;		/* Right ascension or longitude in degrees */
-double	ypos;		/* Declination or latitude in degrees */
-struct WorldCoor *wcs;	/* WCS parameter structure */
-
-/* Output: */
-double	*xpix;		/* x pixel number  (RA or long without rotation) */
-double	*ypix;		/* y pixel number  (dec or lat without rotation) */
+/*
+*  Parameters:
+*     xpos
+*        Right ascension or longitude in degrees.
+*     ypos
+*        Declination or latitude in degrees.
+*     wcs
+*        WCS parameter structure.
+*     xpix
+*        Returned x pixel number (RA or longitude without rotation).
+*     ypix
+*        Returned y pixel number (Dec or latitude without rotation).
+*/
 
 {
   double div,xi,eta,x,y,xy,x2,y2,x2y,y2x,x3,y3,x4,y4,x2y2,cjunk,dx,dy;
