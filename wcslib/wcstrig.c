@@ -91,9 +91,7 @@ const double angle;
 
 /*--------------------------------------------------------------------------*/
 
-double astTand(angle)
-
-const double angle;
+double astTand(double angle)
 
 {
    double resid;
@@ -112,9 +110,7 @@ const double angle;
 
 /*--------------------------------------------------------------------------*/
 
-double astACosd(v)
-
-const double v;
+double astACosd(double v)
 
 {
    if (v >= 1.0) {
@@ -130,9 +126,7 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astASind(v)
-
-const double v;
+double astASind(double v)
 
 {
    if (v <= -1.0) {
@@ -148,9 +142,7 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astATand(v)
-
-const double v;
+double astATand(double v)
 
 {
    if (v == -1.0) {
@@ -166,9 +158,7 @@ const double v;
 
 /*--------------------------------------------------------------------------*/
 
-double astATan2d(y, x)
-
-const double x, y;
+double astATan2d(double y, double x)
 
 {
    if (y == 0.0) {
