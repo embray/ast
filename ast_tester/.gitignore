@@ -1,0 +1,19 @@
+# Ignore test binaries but not sources
+*.log
+*.trs
+*.o
+ast_test
+simplify
+test*
+wcsconverter
+!test*.c
+!test*.f
+!test*.sh
+
+# Generated test outputs
+lsst_wcs.asdf
+nativetest.yaml
+sphmap_roundtrip.asdf
+sm.txt
+tanSipWcs.asdf
+yamltest.asdf
