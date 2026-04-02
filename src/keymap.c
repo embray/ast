@@ -2715,7 +2715,7 @@ static void DumpEntry( AstMapEntry *entry, AstChannel *channel, int nentry, int 
 */
 
 /* Local Variables: */
-   char buff[20];                /* Buffer for item names */
+   char buff[30];                /* Buffer for item names */
    char pbuff[100];              /* Buffer for pointer values */
    const char *com;              /* Pointer to comment string */
    int index;                    /* Index into vector valued entry */

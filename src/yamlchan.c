@@ -8255,7 +8255,7 @@ static AstMapping *ReadPoly( AstYamlChan *this, AstKeyMap *km, int isortho,
    AstMapping *result;
    AstMapping *pm;
    AstWinMap *wm;
-   char rowname[20];
+   char rowname[30];
    double *cof_ptr;
    double *coeff_f;
    double *domain;

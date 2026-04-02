@@ -2342,7 +2342,7 @@ static void UpdateHeader( AstFitsTable *this, const char *method,
    char *dimbuf;
    char buf[ 20 ];
    char code;
-   char keyword[ 14 ];
+   char keyword[ 20 ];
    const char *unit;
    const char *name;
    int *dims;

@@ -1725,7 +1725,7 @@ static int mark_new = 0;
 static int createkeyword_seq_nchars = -1;
 
 /* Buffer for value returned by FormatKey */
-static char formatkey_buff[ 10 ];
+static char formatkey_buff[ 40 ];
 
 /* Buffer for value returned by FitsGetCom */
 static char fitsgetcom_sval[ AST__FITSCHAN_FITSCARDLEN + 1 ];

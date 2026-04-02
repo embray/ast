@@ -3076,7 +3076,7 @@ static char *ChrMatcher( const char *test, const char *end, const char *template
    char *result;
    char *sres;
    char *stest;
-   char stemp[10];
+   char stemp[24];
    const char *aaa;
    const char *aa;
    const char *a;

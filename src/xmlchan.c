@@ -7855,10 +7855,10 @@ static void ReCentreAnc( AstRegion *region, int nanc, AstKeyMap **ancs, int *sta
    AstObject *o;
    AstRegion *r2;
    AstRegion *r;
-   char orgatt[ 20 ];
+   char orgatt[ 30 ];
    char orgset[ 80 ];
    char setting[ 80 ];
-   char sysatt[ 20 ];
+   char sysatt[ 30 ];
    char sysset[ 80 ];
    const char *old_unit;
    const char *time_unit;
