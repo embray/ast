@@ -72,9 +72,12 @@ The CMake build does not require any Starlink infrastructure.
 ```shell
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-ctest --test-dir build
+ctest --test-dir build --output-on-failure
 cmake --install build --prefix /usr/local
 ```
+
+The test suite includes 30 tests covering most AST classes. See `PLAN.md`
+for details on test coverage and remaining work.
 
 ### CMake options
 
