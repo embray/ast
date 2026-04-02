@@ -46,19 +46,23 @@ int main(){
    } else {
 
       for( i = 0; i < nx+k; i++ ){
-         fscanf( in, "%lf", tx + i );
+         if( fscanf( in, "%lf", tx + i ) != 1 )
+            astError( AST__INTER, "Failed to read tx[%d]", i );
       }
 
       for( i = 0; i < ny+k; i++ ){
-         fscanf( in, "%lf", ty + i );
+         if( fscanf( in, "%lf", ty + i ) != 1 )
+            astError( AST__INTER, "Failed to read ty[%d]", i );
       }
 
       for( i = 0; i < nx*ny; i++ ){
-         fscanf( in, "%lf", cu + i );
+         if( fscanf( in, "%lf", cu + i ) != 1 )
+            astError( AST__INTER, "Failed to read cu[%d]", i );
       }
 
       for( i = 0; i < nx*ny; i++ ){
-         fscanf( in, "%lf", cv + i );
+         if( fscanf( in, "%lf", cv + i ) != 1 )
+            astError( AST__INTER, "Failed to read cv[%d]", i );
       }
 
       fclose( in );
