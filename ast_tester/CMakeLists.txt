@@ -83,6 +83,7 @@ ast_add_test(testcmpmap)
 ast_add_test(testpolymap)
 ast_add_test(testchebymap)
 ast_add_test(testunitnormmap_c SOURCES testunitnormmap.c)
+ast_add_test(testtrangrid)
 
 # --- Conditional tests ---
 if(HAVE_YAML)
