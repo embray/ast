@@ -60,7 +60,7 @@ The CMake build does not require any Starlink infrastructure.
 
 ### Prerequisites
 
-- CMake >= 3.14
+- CMake >= 3.24
 - A C compiler
 - Perl (for generating the `ast.h` public header)
 - Optional: libyaml (for YAML channel support)

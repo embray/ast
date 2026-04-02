@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.24)
 
 # Version is defined to match configure.ac
 project(ast
@@ -710,6 +710,7 @@ if(BUILD_TESTING)
     )
     target_include_directories(ast_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
     add_test(NAME ast_test COMMAND ast_test)
+    add_subdirectory(ast_tester)
 endif()
 
 # ============================================================
