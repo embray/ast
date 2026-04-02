@@ -63,7 +63,7 @@ configure_file(2dspline_c.dat "${CMAKE_CURRENT_BINARY_DIR}/2dspline_c.dat" COPYO
 ast_add_test(testsplinemap_c)
 
 # --- Conditional tests ---
-# --- Fortran tests converted to C ---
+# --- Fortran tests converted to C (Batch 1) ---
 ast_add_test(testzoommap)
 ast_add_test(testnormmap)
 ast_add_test(testmapping)
@@ -72,6 +72,14 @@ ast_add_test(testcmpframe)
 ast_add_test(testlutmap)
 ast_add_test(testratemap)
 ast_add_test(testchannel)
+
+# --- Fortran tests converted to C (Batch 2) ---
+ast_add_test(testrate)
+ast_add_test(testspecframe)
+ast_add_test(testflux)
+ast_add_test(testspecflux)
+configure_file(splittest1.ast "${CMAKE_CURRENT_BINARY_DIR}/splittest1.ast" COPYONLY)
+ast_add_test(testcmpmap)
 
 # --- Conditional tests ---
 if(HAVE_YAML)
