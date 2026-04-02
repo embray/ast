@@ -86,8 +86,10 @@ Key issues:
   because near-zero values can differ between simplified and unsimplified
   Mappings.
 
-- **testspecflux.c**: `checkdump` only verifies round-trip succeeds; Fortran
-  version also compared via `ast_overlap`. **TODO**: Strengthen with `astEqual`.
+- **testspecflux.c**: `checkdump` only verifies round-trip succeeds.
+  `astEqual` segfaults on SpecFluxFrame and `astOverlap` is not applicable
+  (SpecFluxFrame is a Frame, not a Region). The Fortran version used
+  attribute comparison via the COMMON-block channel callbacks.
 
 - **testzoommap.c**: Simplified immutability error recovery (checks `!astOK`
   rather than specific `AST__IMMUT` code).

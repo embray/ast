@@ -7,7 +7,8 @@
  *  the before/after objects using ast_overlap; this C version only
  *  checks that the round-trip read succeeds (non-null result).
  *
- *  TODO: Strengthen checkdump to use astEqual or astOverlap.
+ *  Only checks the round-trip read succeeds; astEqual segfaults on
+ *  SpecFluxFrame and astOverlap is not applicable (not a Region).
  */
 #include "ast.h"
 #include <stdio.h>
