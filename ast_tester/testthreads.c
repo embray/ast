@@ -111,6 +111,7 @@ void *worker( void *ptr ) {
    astTran1( data->obj, 1, &xin, 1, &xout );
 
    if( data->lock ) astUnlock( data->obj, 1 );
+   return NULL;
 }
 
 
