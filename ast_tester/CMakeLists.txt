@@ -80,6 +80,7 @@ ast_add_test(testflux)
 ast_add_test(testspecflux)
 configure_file(splittest1.ast "${CMAKE_CURRENT_BINARY_DIR}/splittest1.ast" COPYONLY)
 ast_add_test(testcmpmap)
+ast_add_test(testpolymap)
 
 # --- Conditional tests ---
 if(HAVE_YAML)
