@@ -38721,9 +38721,11 @@ static AstMapping *WcsOthers( AstFitsChan *this, FitsStore *store, char s,
 /* Append the CTYPE value to the final Domain value for the primary Frame. */
             if( ckeyval && astChrLen( ckeyval ) > 0 ) {
                if( newdom ) {
-                  sprintf( buf, "%s-%s", newdom, buf2 );
+                  char tmpbuf[ 500 ];
+                  snprintf( tmpbuf, sizeof(tmpbuf), "%s-%s", newdom, buf2 );
+                  strcpy( buf, tmpbuf );
                } else {
-                  sprintf( buf, "%s", buf2 );
+                  snprintf( buf, sizeof(buf), "%s", buf2 );
                   newdom = buf;
                }
             }
