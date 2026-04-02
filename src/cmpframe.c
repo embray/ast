@@ -8513,9 +8513,9 @@ static void SetAttrib( AstObject *this_object, const char *setting, int *status 
 
 /* Create a new setting with the same name but with the axis index
    appropriate to the primary Frame. */
-               nc = sprintf( buf2, "%s(%d)=%s", buf1, paxis + 1,
-                             setting+value );
-               if( nc < BUF_LEN ) {
+               nc = snprintf( buf2, sizeof(buf2), "%s(%d)=%s", buf1, paxis + 1,
+                              setting+value );
+               if( nc >= 0 && nc < BUF_LEN ) {
 
 /* Attempt to access the attribute. */
                   astSetAttrib( pfrm, buf2 );
