@@ -1,6 +1,12 @@
 /*
  *  Test the Moc class.
  *  Converted from the Fortran test testmoc.f.
+ *
+ *  The Fortran version uses psx_calloc/psx_free and %val(cnf_pval()) for
+ *  dynamic memory; this C version uses astMalloc/astFree directly.
+ *
+ *  The Fortran astGetCell uses 1-based cell indices; the C API uses
+ *  0-based indices.
  */
 #include "ast.h"
 #include <stdio.h>

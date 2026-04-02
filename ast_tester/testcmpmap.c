@@ -1,6 +1,10 @@
 /*
  *  Test the CmpMap class (MapSplit).
  *  Converted from the Fortran test testcmpmap.f.
+ *
+ *  The Fortran version reads splittest1.ast via a channel source callback
+ *  subroutine reading from a Fortran unit. This C version uses the
+ *  Channel SourceFile attribute instead, which is functionally equivalent.
  */
 #include "ast.h"
 #include <stdio.h>

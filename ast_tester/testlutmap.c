@@ -1,6 +1,7 @@
 /*
  *  Test the LutMap class.
  *  Converted from the Fortran test testlutmap.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

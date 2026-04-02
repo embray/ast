@@ -1,6 +1,9 @@
 /*
  *  Test the ChebyMap class.
  *  Converted from the Fortran test testchebymap.f.
+ *
+ *  The checkdump round-trip uses Channel SinkFile/SourceFile instead of
+ *  Fortran channel source/sink callbacks (functionally equivalent).
  */
 #include "ast.h"
 #include <stdio.h>

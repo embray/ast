@@ -1,6 +1,13 @@
 /*
  *  Test the SpecFluxFrame class.
  *  Converted from the Fortran test testspecflux.f.
+ *
+ *  The checkdump round-trip uses astToString/astFromString instead of
+ *  Fortran channel source/sink callbacks. The Fortran version compared
+ *  the before/after objects using ast_overlap; this C version only
+ *  checks that the round-trip read succeeds (non-null result).
+ *
+ *  TODO: Strengthen checkdump to use astEqual or astOverlap.
  */
 #include "ast.h"
 #include <stdio.h>

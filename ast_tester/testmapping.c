@@ -1,6 +1,7 @@
 /*
  *  Test Mapping class (PolyMap / LinearApprox).
  *  Converted from the Fortran test testmapping.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

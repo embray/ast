@@ -1,6 +1,7 @@
 /*
  *  Test the astRate function.
  *  Converted from the Fortran test testrate.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

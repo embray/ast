@@ -1,6 +1,17 @@
 /*
  *  Test the UnitNormMap class.
  *  Converted from the Fortran test testunitnormmap.f.
+ *
+ *  The checkdump round-trip uses Channel SinkFile/SourceFile instead of
+ *  Fortran channel source/sink callbacks.
+ *
+ *  The differ() function includes an absolute tolerance floor of 1e-14,
+ *  not present in the Fortran version, because near-zero values can
+ *  differ slightly between unsimplified and simplified Mappings due to
+ *  floating-point rounding in different code paths. The Fortran version
+ *  uses a purely relative tolerance which happens to pass because the
+ *  Fortran wrapper's argument marshalling produces a different rounding
+ *  pattern.
  */
 #include "ast.h"
 #include <stdio.h>

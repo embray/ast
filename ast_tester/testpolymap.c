@@ -1,6 +1,7 @@
 /*
  *  Test the PolyMap class (PolyTran, PolyCoeffs, IterInverse).
  *  Converted from the Fortran test testpolymap.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

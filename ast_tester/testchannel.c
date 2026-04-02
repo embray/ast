@@ -1,6 +1,9 @@
 /*
  *  Test the Channel class (file-based I/O).
  *  Converted from the Fortran test testchannel.f.
+ *
+ *  This C version cleans up the temporary files (fred.txt, fred2.txt)
+ *  on exit; the Fortran version leaves them behind.
  */
 #include "ast.h"
 #include "ast_err.h"

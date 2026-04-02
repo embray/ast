@@ -1,6 +1,7 @@
 /*
  *  Test the RateMap class.
  *  Converted from the Fortran test testratemap.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

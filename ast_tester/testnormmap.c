@@ -1,6 +1,7 @@
 /*
  *  Test the NormMap class.
  *  Converted from the Fortran test testnormmap.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

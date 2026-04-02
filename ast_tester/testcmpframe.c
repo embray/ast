@@ -1,6 +1,7 @@
 /*
  *  Test the CmpFrame class (NormPoints).
  *  Converted from the Fortran test testcmpframe.f.
+ *  Direct conversion; no material differences from the Fortran original.
  */
 #include "ast.h"
 #include <stdio.h>

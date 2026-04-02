@@ -1,6 +1,11 @@
 /*
  *  Test the ZoomMap class.
  *  Converted from the Fortran test testzoommap.f.
+ *
+ *  The Fortran version uses err_mark/err_rlse to bracket the immutability
+ *  tests, and checks for the specific AST__IMMUT error code via the
+ *  Fortran STATUS variable. This C version checks astStatus directly and
+ *  uses a simpler error recovery pattern.
  */
 #include "ast.h"
 #include "ast_err.h"

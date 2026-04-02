@@ -1,6 +1,10 @@
 /*
  *  Test the FluxFrame class.
  *  Converted from the Fortran test testflux.f.
+ *
+ *  The checkdump round-trip uses astToString/astFromString instead of
+ *  Fortran channel source/sink callbacks with COMMON blocks. The
+ *  comparison checks the "specval" attribute only (same as the Fortran).
  */
 #include "ast.h"
 #include <stdio.h>
