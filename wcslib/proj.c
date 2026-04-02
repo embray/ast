@@ -1265,7 +1265,12 @@ int astZPNset(struct AstPrjPrm *prj)
 
    prj->n = k;
 
-   if (k >= 3) {
+   if (k < 2) {
+      /* No point of inflection for polynomials of degree < 2. */
+      prj->w[0] = PI;
+      prj->w[1] = 0.0;
+
+   } else {
       /* Find the point of inflection closest to the pole. */
       zd1 = 0.0;
       d1  = prj->p[1];
@@ -2472,12 +2477,12 @@ int astAITrev(double x, double y, struct AstPrjPrm *prj, double *phi, double *th
    }
 
    u = 1.0 - x*x*prj->w[2] - y*y*prj->w[1];
-   if (u < 0.0) {
-      if (u < -tol) {
+   if (u < 0.5) {
+      if (u < 0.5-tol) {
          return 2;
       }
 
-      u = 0.0;
+      u = 0.5;
    }
 
    z = sqrt(u);
