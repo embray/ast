@@ -6,10 +6,17 @@
 
 
 void stopit( int i, int *status );
-void test1( AstObject *obj, const char *text, int *status );
-void test2( AstObject *obj, const char *text, int *status );
-void test3( AstObject *obj, AstObject *obj2, const char *text, int *status );
-void test4( AstMapping *map, AstMapping *map2, const char *text, int *status );
+void check_imaging_wcs( AstObject *obj, const char *text, int *status );
+void check_tansip_wcs( AstObject *obj, const char *text, int *status );
+void check_equal_transforms( AstObject *obj, AstObject *obj2, const char *text, int *status );
+void check_sphmap_mappings( AstMapping *map, AstMapping *map2, const char *text, int *status );
+
+void test_yamlencoding_attribute( int *status );
+void test_imaging_wcs_roundtrip( int *status );
+void test_tansip_wcs_roundtrip( int *status );
+void test_lsst_wcs_roundtrip( int *status );
+void test_native_encoding_roundtrip( int *status );
+void test_sphmap_roundtrip( int *status );
 
 int chrMatch( const char *a, const char *b ){
    int result = 0;
@@ -21,148 +28,19 @@ int main(){
 
    int status_value;
    int *status = &status_value;
-   AstObject *obj;
-   AstYamlChan *ch;
-   AstObject *obj2;
-   AstChannel *ch2;
 
    status_value = SAI__OK;
 
    astBegin;
 
-//     call ast_watchmemory( 8200 );
-
-   ch = astYamlChan( NULL, NULL, " " );
-
-   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( -1, status );
-
-   if( astTest( ch, "YAMLENCODING" ) ) stopit( -2, status );
-
-   astSetC( ch, "YamlEncoding", "ASDF" );
-
-   if( !astTest( ch, "YAMLENCODING" ) ) stopit( -3, status );
-
-   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( -4, status );
-
-   astClear( ch, "YamlEncoding" );
-
-   if( astTest( ch, "YAMLENCODING" ) ) stopit( -5, status );
-
-   if( !chrMatch(astGetC( ch, "YAMLENCODING" ),"ASDF") ) stopit( -6, status );
-
-   astSet( ch, "SourceFile=imaging_wcs.asdf,SinkFile=yamltest.asdf" );
-
-   obj = astRead( ch );
-   test1( obj, "Read tests failed for imaging_wcs.asdf", status );
-
-   if( astWrite( ch, obj ) != 1 ) stopit( 13, status );
-
-   astClear( ch, "SourceFile,SinkFile" );
-   astSet( ch, "SourceFile=yamltest.asdf" );
-   astClear( ch, "YamlEncoding" );
-
-   obj2 = astRead( ch );
-   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( 131, status );
-   test1( obj, "Read tests failed for yamltest.asdf", status );
-
-   ch2 = astChannel( NULL, NULL, " " );
-   astSet( ch2, "SourceFile=tanSipWcs.txt" );
-   obj = astRead( ch2 );
-   test2( obj, "Read tests failed for tanSipWcs.txt", status );
-
-   astClear( ch, "SourceFile,SinkFile" );
-   astSet( ch, "SinkFile=tanSipWcs.asdf" );
-   if( astWrite( ch, obj ) != 1 ) stopit( 14, status );
-
-   astClear( ch, "SourceFile,SinkFile" );
-   astSet( ch, "SourceFile=tanSipWcs.asdf" );
-   obj2 = astRead( ch );
-
-   test2( obj2, "Read tests failed for tanSipWcs.asdf", status );
-
-   astSet( ch2, "SourceFile=lsst_wcs.txt" );
-   obj = astRead( ch2 );
-
-   astSet( ch, "SinkFile=lsst_wcs.asdf" );
-   if( astWrite( ch, obj ) != 1 ) stopit( 15, status );
-
-   astClear( ch, "SinkFile" );
-   astSet( ch, "SourceFile=lsst_wcs.asdf" );
-   obj2 = astRead( ch );
-
-   if( !obj2 ) stopit( 16, status );
-
-   test3( obj, obj2, "Tests failed for lsst_wcs.txt", status );
-
-/*Test NATIVE encoding. */
-   ch = astYamlChan( NULL, NULL, "YamlEncoding=NATIVE " );
-
-   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "NATIVE" ) ) stopit( 17, status );
-
-   if( !astTest( ch, "YAMLENCODING" ) ) stopit( 18, status );
-
-   astSet( ch, "SinkFile=nativetest.yaml" );
-
-   if( astWrite( ch, obj ) != 1 ) stopit( 19, status );
-
-   astClear( ch, "YamlEncoding" );
-   astClear( ch, "SinkFile" );
-   astSet( ch, "SourceFile=nativetest.yaml" );
-
-   obj2 = astRead( ch );
-
-   if( !obj2 ) stopit( 20, status );
-
-   if( !astEqual( obj2, obj ) ) stopit( 21, status );
-
-   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "NATIVE") ) stopit( 22, status );
-
-/* Test SphMap round-trip: write a FrameSet containing an AST SphMap to
-   ASDF, read it back, and verify the recovered mapping gives the same
-   numerical results as the original (i.e. keeps the correct units in
-   radians). */
-   {
-      AstYamlChan *ch_rt;
-      AstFrame *frm3d;
-      AstFrame *frm2d;
-      AstFrameSet *sphfs;
-      AstObject *sphfs2;
-      AstMapping *sphmap;
-      AstMapping *sphmap2;
-
-      frm3d = astFrame( 3, "Domain=CART3D" );
-      frm2d = astFrame( 2, "Domain=SPH" );
-      sphmap = (AstMapping *) astSphMap( " " );
-      sphfs = astFrameSet( frm3d, " " );
-      astAddFrame( sphfs, AST__BASE, sphmap, frm2d );
-      sphmap = astAnnul( sphmap );
-      frm3d = astAnnul( frm3d );
-      frm2d = astAnnul( frm2d );
-
-      ch_rt = astYamlChan( NULL, NULL, " " );
-      astSet( ch_rt, "SinkFile=sphmap_roundtrip.asdf" );
-      if( astWrite( ch_rt, sphfs ) != 1 ) stopit( 30, status );
-
-      astClear( ch_rt, "SinkFile" );
-      astSet( ch_rt, "SourceFile=sphmap_roundtrip.asdf" );
-      sphfs2 = astRead( ch_rt );
-      if( !sphfs2 ) stopit( 31, status );
-
-      sphmap  = astGetMapping( sphfs,  AST__BASE, AST__CURRENT );
-      sphmap2 = astGetMapping( (AstFrameSet *) sphfs2, AST__BASE, AST__CURRENT );
-
-      test4( sphmap, sphmap2, "SphMap round-trip test failed", status );
-
-      sphmap  = astAnnul( sphmap );
-      sphmap2 = astAnnul( sphmap2 );
-      sphfs   = astAnnul( sphfs );
-      sphfs2  = astAnnul( sphfs2 );
-      ch_rt   = astAnnul( ch_rt );
-   }
+   test_yamlencoding_attribute( status );
+   test_imaging_wcs_roundtrip( status );
+   test_tansip_wcs_roundtrip( status );
+   test_lsst_wcs_roundtrip( status );
+   test_native_encoding_roundtrip( status );
+   test_sphmap_roundtrip( status );
 
    astEnd;
-//   astActivememory( " " );
-//   astFlushmemory( 1 );
 
    if( *status == SAI__OK ) {
       printf( " All YamlChan tests passed\n" );
@@ -183,7 +61,223 @@ void stopit( int i, int *status ){
 
 
 
-void test1( AstObject *obj, const char *text, int *status ){
+/* Test getting, setting, and clearing the YamlEncoding attribute. */
+void test_yamlencoding_attribute( int *status ){
+   AstYamlChan *ch;
+
+   if( *status != SAI__OK ) return;
+
+   ch = astYamlChan( NULL, NULL, " " );
+
+   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( -1, status );
+
+   if( astTest( ch, "YAMLENCODING" ) ) stopit( -2, status );
+
+   astSetC( ch, "YamlEncoding", "ASDF" );
+
+   if( !astTest( ch, "YAMLENCODING" ) ) stopit( -3, status );
+
+   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( -4, status );
+
+   astClear( ch, "YamlEncoding" );
+
+   if( astTest( ch, "YAMLENCODING" ) ) stopit( -5, status );
+
+   if( !chrMatch(astGetC( ch, "YAMLENCODING" ),"ASDF") ) stopit( -6, status );
+
+   astAnnul( ch );
+}
+
+
+
+/* Test round-trip of imaging_wcs.asdf: write to yamltest.asdf, read back,
+   verify numerical transform results are unchanged. */
+void test_imaging_wcs_roundtrip( int *status ){
+   AstYamlChan *ch;
+   AstObject *obj;
+   AstObject *obj2;
+
+   if( *status != SAI__OK ) return;
+
+   ch = astYamlChan( NULL, NULL, " " );
+   astSet( ch, "SourceFile=imaging_wcs.asdf,SinkFile=yamltest.asdf" );
+
+   obj = astRead( ch );
+   check_imaging_wcs( obj, "Read tests failed for imaging_wcs.asdf", status );
+
+   if( astWrite( ch, obj ) != 1 ) stopit( 13, status );
+
+   astClear( ch, "SourceFile,SinkFile" );
+   astSet( ch, "SourceFile=yamltest.asdf" );
+   astClear( ch, "YamlEncoding" );
+
+   obj2 = astRead( ch );
+   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "ASDF" ) ) stopit( 131, status );
+   check_imaging_wcs( obj2, "Read tests failed for yamltest.asdf", status );
+
+   astAnnul( obj );
+   astAnnul( obj2 );
+   astAnnul( ch );
+}
+
+
+
+/* Test round-trip of tanSipWcs: read from tanSipWcs.txt (native AST channel),
+   write to tanSipWcs.asdf, read back from ASDF, verify transform values. */
+void test_tansip_wcs_roundtrip( int *status ){
+   AstYamlChan *ch;
+   AstChannel *ch2;
+   AstObject *obj;
+   AstObject *obj2;
+
+   if( *status != SAI__OK ) return;
+
+   ch  = astYamlChan( NULL, NULL, " " );
+   ch2 = astChannel( NULL, NULL, " " );
+
+   astSet( ch2, "SourceFile=tanSipWcs.txt" );
+   obj = astRead( ch2 );
+   check_tansip_wcs( obj, "Read tests failed for tanSipWcs.txt", status );
+
+   astSet( ch, "SinkFile=tanSipWcs.asdf" );
+   if( astWrite( ch, obj ) != 1 ) stopit( 14, status );
+
+   astClear( ch, "SourceFile,SinkFile" );
+   astSet( ch, "SourceFile=tanSipWcs.asdf" );
+   obj2 = astRead( ch );
+   check_tansip_wcs( obj2, "Read tests failed for tanSipWcs.asdf", status );
+
+   astAnnul( obj );
+   astAnnul( obj2 );
+   astAnnul( ch );
+   astAnnul( ch2 );
+}
+
+
+
+/* Test round-trip of lsst_wcs: read from lsst_wcs.txt, write to
+   lsst_wcs.asdf, read back, verify transforms agree numerically. */
+void test_lsst_wcs_roundtrip( int *status ){
+   AstYamlChan *ch;
+   AstChannel *ch2;
+   AstObject *obj;
+   AstObject *obj2;
+
+   if( *status != SAI__OK ) return;
+
+   ch  = astYamlChan( NULL, NULL, " " );
+   ch2 = astChannel( NULL, NULL, " " );
+
+   astSet( ch2, "SourceFile=lsst_wcs.txt" );
+   obj = astRead( ch2 );
+
+   astSet( ch, "SinkFile=lsst_wcs.asdf" );
+   if( astWrite( ch, obj ) != 1 ) stopit( 15, status );
+
+   astClear( ch, "SinkFile" );
+   astSet( ch, "SourceFile=lsst_wcs.asdf" );
+   obj2 = astRead( ch );
+   if( !obj2 ) stopit( 16, status );
+
+   check_equal_transforms( obj, obj2, "Tests failed for lsst_wcs.txt", status );
+
+   astAnnul( obj );
+   astAnnul( obj2 );
+   astAnnul( ch );
+   astAnnul( ch2 );
+}
+
+
+
+/* Test NATIVE encoding round-trip: write and read back using YamlEncoding=NATIVE,
+   verify the recovered object is equal to the original. */
+void test_native_encoding_roundtrip( int *status ){
+   AstYamlChan *ch;
+   AstChannel *ch2;
+   AstObject *obj;
+   AstObject *obj2;
+
+   if( *status != SAI__OK ) return;
+
+   ch2 = astChannel( NULL, NULL, " " );
+   astSet( ch2, "SourceFile=lsst_wcs.txt" );
+   obj = astRead( ch2 );
+   astAnnul( ch2 );
+
+   ch = astYamlChan( NULL, NULL, "YamlEncoding=NATIVE " );
+
+   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "NATIVE" ) ) stopit( 17, status );
+
+   if( !astTest( ch, "YAMLENCODING" ) ) stopit( 18, status );
+
+   astSet( ch, "SinkFile=nativetest.yaml" );
+   if( astWrite( ch, obj ) != 1 ) stopit( 19, status );
+
+   astClear( ch, "YamlEncoding" );
+   astClear( ch, "SinkFile" );
+   astSet( ch, "SourceFile=nativetest.yaml" );
+   obj2 = astRead( ch );
+   if( !obj2 ) stopit( 20, status );
+
+   if( !astEqual( obj2, obj ) ) stopit( 21, status );
+
+   if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "NATIVE") ) stopit( 22, status );
+
+   astAnnul( obj );
+   astAnnul( obj2 );
+   astAnnul( ch );
+}
+
+
+
+/* Test SphMap round-trip: write a FrameSet containing an AST SphMap to
+   ASDF, read it back, and verify the recovered mapping gives the same
+   numerical results as the original (i.e. keeps the correct units in
+   radians). */
+void test_sphmap_roundtrip( int *status ){
+   AstYamlChan *ch;
+   AstFrame *frm3d;
+   AstFrame *frm2d;
+   AstFrameSet *sphfs;
+   AstObject *sphfs2;
+   AstMapping *sphmap;
+   AstMapping *sphmap2;
+
+   if( *status != SAI__OK ) return;
+
+   frm3d = astFrame( 3, "Domain=CART3D" );
+   frm2d = astFrame( 2, "Domain=SPH" );
+   sphmap = (AstMapping *) astSphMap( " " );
+   sphfs = astFrameSet( frm3d, " " );
+   astAddFrame( sphfs, AST__BASE, sphmap, frm2d );
+   astAnnul( sphmap );
+   astAnnul( frm3d );
+   astAnnul( frm2d );
+
+   ch = astYamlChan( NULL, NULL, " " );
+   astSet( ch, "SinkFile=sphmap_roundtrip.asdf" );
+   if( astWrite( ch, sphfs ) != 1 ) stopit( 30, status );
+
+   astClear( ch, "SinkFile" );
+   astSet( ch, "SourceFile=sphmap_roundtrip.asdf" );
+   sphfs2 = astRead( ch );
+   if( !sphfs2 ) stopit( 31, status );
+
+   sphmap  = astGetMapping( sphfs,  AST__BASE, AST__CURRENT );
+   sphmap2 = astGetMapping( (AstFrameSet *) sphfs2, AST__BASE, AST__CURRENT );
+
+   check_sphmap_mappings( sphmap, sphmap2, "SphMap round-trip test failed", status );
+
+   astAnnul( sphmap );
+   astAnnul( sphmap2 );
+   astAnnul( sphfs );
+   astAnnul( sphfs2 );
+   astAnnul( ch );
+}
+
+
+
+void check_imaging_wcs( AstObject *obj, const char *text, int *status ){
    double xout[ 6 ];
    double yout[ 6 ];
    double xin[ 6 ] = {-0.25, -2.0, -1.0,  0.1, 1.5, 1.0 };
@@ -225,7 +319,7 @@ void test1( AstObject *obj, const char *text, int *status ){
 
 
 
-void test2( AstObject *obj, const char *text, int *status ){
+void check_tansip_wcs( AstObject *obj, const char *text, int *status ){
    int i;
    double xout[ 6 ];
    double xin[ 6 ] = {-25.0, -200.0, -100.0,  10.0, 150.0, 100.0 };
@@ -249,7 +343,6 @@ void test2( AstObject *obj, const char *text, int *status ){
       }
    }
 
-
    astTran2( obj, 6, xout, yout, 0, xrec, yrec );
    for( i = 0; i < 6; i++ ){
       if( fabs( xin[ i ] - xrec[ i ] ) > 1.0E-8 ) {
@@ -266,7 +359,8 @@ void test2( AstObject *obj, const char *text, int *status ){
 }
 
 
-void test3( AstObject *obj, AstObject *obj2, const char *text, int *status ){
+
+void check_equal_transforms( AstObject *obj, AstObject *obj2, const char *text, int *status ){
 
    int i;
    double xout[ 6 ];
@@ -295,7 +389,6 @@ void test3( AstObject *obj, AstObject *obj2, const char *text, int *status ){
       }
    }
 
-
    astTran2( obj, 6, xout, yout, 0, xrec, yrec );
    astTran2( obj, 6, xout2, yout2, 0, xrec2, yrec2 );
 
@@ -309,15 +402,14 @@ void test3( AstObject *obj, AstObject *obj2, const char *text, int *status ){
       }
    }
 
-
    if( *status != SAI__OK ) printf( "%s\n", text );
 
 }
 
 
 
-void test4( AstMapping *map, AstMapping *map2, const char *text, int *status ){
-/* Three test points as unit (or near-unit) 3-D Cartesian vectors.
+void check_sphmap_mappings( AstMapping *map, AstMapping *map2, const char *text, int *status ){
+/* Three test points as unit 3-D Cartesian vectors.
    Layout for astTranN: in[coord * npoint + point], npoint=3, indim=3. */
    double s = 1.0 / sqrt( 3.0 );
    double xin[9] = {
@@ -345,5 +437,3 @@ void test4( AstMapping *map, AstMapping *map2, const char *text, int *status ){
 
    if( *status != SAI__OK ) printf( "%s\n", text );
 }
-
-
