@@ -153,7 +153,7 @@ static int class_init = 0;       /* Virtual function table initialised? */
 /* The following functions have public prototypes only (i.e. no
    protected prototypes), so we must provide local prototypes for use
    within this module. */
-AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const double[2], void *, const char *, ... );
+AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const double *, void *, const char *, ... );
 
 /* Prototypes for Private Member Functions. */
 /* ======================================== */
@@ -2366,7 +2366,7 @@ astMAKE_ISA(Ellipse,Region)
 astMAKE_CHECK(Ellipse)
 
 AstEllipse *astEllipse_( void *frame_void, int form, const double centre[2],
-                         const double point1[2], const double point2[2],
+                         const double point1[2], const double *point2,
                          AstRegion *unc, const char *options, int *status, ...) {
 /*
 *++
@@ -2555,7 +2555,7 @@ f     function is invoked with STATUS set to an error value, or if it
 }
 
 AstEllipse *astEllipseId_( void *frame_void, int form, const double centre[2],
-                         const double point1[2], const double point2[2],
+                         const double point1[2], const double *point2,
                          void *unc_void, const char *options, ... ) {
 /*
 *  Name:
@@ -2651,7 +2651,7 @@ AstEllipse *astEllipseId_( void *frame_void, int form, const double centre[2],
 AstEllipse *astInitEllipse_( void *mem, size_t size, int init, AstEllipseVtab *vtab,
                              const char *name, AstFrame *frame, int form,
                              const double centre[2], const double point1[2],
-                             const double point2[2], AstRegion *unc, int *status ){
+                             const double *point2, AstRegion *unc, int *status ){
 /*
 *+
 *  Name:

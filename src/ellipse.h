@@ -157,9 +157,9 @@ astPROTO_ISA(Ellipse)            /* Test class membership */
 
 /* Constructor. */
 #if defined(astCLASS)            /* Protected. */
-AstEllipse *astEllipse_( void *, int, const double[2], const double[2], const double[2], AstRegion *, const char *, int *, ...);
+AstEllipse *astEllipse_( void *, int, const double[2], const double[2], const double *, AstRegion *, const char *, int *, ...);
 #else
-AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const double[2], AstRegion *, const char *, ... )__attribute__((format(printf,7,8)));
+AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const double *, AstRegion *, const char *, ... )__attribute__((format(printf,7,8)));
 #endif
 
 #if defined(astCLASS)            /* Protected */
@@ -167,7 +167,7 @@ AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const 
 /* Initialiser. */
 AstEllipse *astInitEllipse_( void *, size_t, int, AstEllipseVtab *,
                            const char *, AstFrame *, int, const double[2],
-                           const double[2], const double[2], AstRegion *, int * );
+                           const double[2], const double *, AstRegion *, int * );
 
 /* Vtab initialiser. */
 void astInitEllipseVtab_( AstEllipseVtab *, const char *, int * );

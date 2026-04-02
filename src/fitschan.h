@@ -495,7 +495,7 @@ void astInitFitsChanGlobals_( AstFitsChanGlobals * );
    void astShowFits_( AstFitsChan *, int * );
    void astPurgeWCS_( AstFitsChan *, int * );
    void astPutCards_( AstFitsChan *, const char *, int * );
-   void astPutFits_( AstFitsChan *, const char [81], int, int * );
+   void astPutFits_( AstFitsChan *, const char *, int, int * );
    void astPutTable_( AstFitsChan *, struct AstFitsTable *, const char *, int * );
    void astPutTables_( AstFitsChan *, AstKeyMap *, int * );
    void astRemoveTables_( AstFitsChan *, const char *, int * );
