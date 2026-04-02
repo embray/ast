@@ -479,7 +479,7 @@ static void LibYamlEmitterError( yaml_emitter_t *, int * );
 static void LibYamlParserError( yaml_parser_t *, int * );
 static void PutIntoKeyMap( AstKeyMap *, const char *, int, void *, int * );
 static void ReadEarthLocation( AstKeyMap *, AstFrame *, int * );
-static void ReadStep( AstYamlChan *, AstKeyMap *, int, AstMapping **, AstFrame **, AstMapping **, int * );
+static void ReadStep( AstYamlChan *, AstKeyMap *, int, int, AstMapping **, AstFrame **, AstMapping **, int * );
 static void ReadYAMLAlias( AstYamlChan *, AstKeyMap *, const char *, const char *, int * );
 static void ReadYAMLEvent( AstYamlChan *, yaml_parser_t *, yaml_event_t *, AstKeyMap *, const char *, int * );
 static void ReadYAMLItem( AstYamlChan *, yaml_parser_t *, AstKeyMap *, const char *, int * );
@@ -9778,8 +9778,8 @@ static AstMapping *ReadSphericalCartesian( AstKeyMap *km, int *status ){
 }
 
 static void ReadStep( AstYamlChan *this, AstKeyMap *km, int report,
-                      AstMapping **pmap, AstFrame **frm, AstMapping **map,
-                      int *status ){
+                      int nax_hint, AstMapping **pmap, AstFrame **frm,
+                      AstMapping **map, int *status ){
 /*
 *  Name:
 *     ReadStep
@@ -9793,8 +9793,8 @@ static void ReadStep( AstYamlChan *this, AstKeyMap *km, int report,
 *  Synopsis:
 *     #include "yamlchan.h"
 *     void ReadStep( AstYamlChan *this, AstKeyMap *km, int report,
-*                    AstMapping **pmap, AstFrame **frm, AstMapping **map,
-*                    int *status )
+*                    int nax_hint, AstMapping **pmap, AstFrame **frm,
+*                    AstMapping **map, int *status )
 
 *  Class Membership:
 *     YamlChan member function
@@ -9810,6 +9810,11 @@ static void ReadStep( AstYamlChan *this, AstKeyMap *km, int report,
 *        Pointer to the KeyMap. Its contents must represent an ASDF step.
 *     report
 *        Report an error if no Mapping is found in the step?
+*     nax_hint
+*        The expected number of axes for the frame in this step, used as
+*        a fallback when the step has no transform (i.e. the last step).
+*        This should be set to the Nout of the previous step's Mapping.
+*        Pass zero if unknown.
 *     pmap
 *        Address at which to return a pointer to a Mapping that must be
 *        applied to generate values in the returned AST Frame (frm). This may
@@ -9852,7 +9857,11 @@ static void ReadStep( AstYamlChan *this, AstKeyMap *km, int report,
          subkm = astAnnul( subkm );
          nax = astGetNin( stepmap );
       } else {
-         nax = 0;
+/* No transform (last step).  Use the hint supplied by the caller (the
+   Nout of the previous step's mapping) so that ReadFrame can determine
+   the correct dimensionality of the frame even when the YAML does not
+   carry explicit axes metadata. */
+         nax = nax_hint;
          stepmap = NULL;
       }
 
@@ -10368,7 +10377,7 @@ static AstFrameSet *ReadWcs( AstYamlChan *this, AstKeyMap *km, int *status ){
 /* Read the first step. Each step has a Frame plus a Mapping from
    that Frame to the Frame in the following step (except for the
    last step, which should have no Mapping). */
-            ReadStep( this, (AstKeyMap *) steps[ 0 ], 1, NULL, &frame, &map, status );
+            ReadStep( this, (AstKeyMap *) steps[ 0 ], 1, 0, NULL, &frame, &map, status );
             steps[ 0 ] = astAnnul( steps[ 0 ] );
 
 /* Create a FrameSet containing the above Frame, setting its Ident or ID to
@@ -10383,8 +10392,9 @@ static AstFrameSet *ReadWcs( AstYamlChan *this, AstKeyMap *km, int *status ){
 /* Loop round reading any remaining steps. The last step should give a
    Frame but no Mapping so do not report an error for (istep==nstep-1). */
             for( istep = 1; istep < nstep; istep++ ) {
+               int nax_next = ( map && astOK ) ? astGetNout( map ) : 0;
                ReadStep( this, (AstKeyMap *) steps[ istep ], (istep < nstep - 1),
-                         &pmap, &frame, &mapnext, status );
+                         nax_next, &pmap, &frame, &mapnext, status );
                steps[ istep ] = astAnnul( steps[ istep ] );
 
 /* The "pmap" mapping (possibly) returned by the above call represents a
@@ -17893,6 +17903,27 @@ static AstKeyMap *WriteSphMap( AstYamlChan *this, AstSphMap *map,
                                       GetName( this, name, (AstMapping *) map,
                                                status ),
                                       status );
+
+/* ASDF spherical_cartesian uses degrees for the spherical coordinates,
+   but AST's SphMap uses radians.  Wrap the transform with a unit-scaling
+   compose so that the ASDF chain is self-consistent in degrees while the
+   overall mapping seen by AST is in radians.  These scales are named
+   AST__DR2D / AST__DD2R so that the simplification pass in WriteAsdfStep
+   can cancel them against adjacent inverse scales (e.g. those added for
+   SkyFrame steps), avoiding redundant compose nodes in the output. */
+   if( astOK ) {
+      if( spherical_to_cartesian ) {
+
+/* Input side is spherical in degrees in ASDF but radians in AST:
+   prepend a radians->degrees scale. */
+         ret = AddR2D( this, &ret, 1, 1, 2, status );
+      } else {
+
+/* Output side is spherical in degrees in ASDF but radians in AST:
+   append a degrees->radians scale. */
+         ret = AddR2D( this, &ret, 0, 0, 2, status );
+      }
+   }
 
 /* Annul the returned object if an error occurred. */
    if( !astOK ) ret = astAnnul( ret );
