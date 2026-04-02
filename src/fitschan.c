@@ -7711,7 +7711,7 @@ static int CnvType( int otype, void *odata, size_t osize, int type, int undef,
             CheckZero( cnvtype_text0, ( (double *) odata )[ 0 ], 0, fitsrnd, status );
             (void) sprintf( cnvtype_text1, "%.*g", AST__DBL_DIG, ( (double *) odata )[ 1 ] );
             CheckZero( cnvtype_text1, ( (double *) odata )[ 1 ], 0, fitsrnd, status );
-            (void) sprintf( cnvtype_text, "%s %s", cnvtype_text0, cnvtype_text1 );
+            (void) snprintf( cnvtype_text, sizeof(cnvtype_text), "%s %s", cnvtype_text0, cnvtype_text1 );
             *( (char **) buff ) = cnvtype_text;
          } else if( type == AST__INT      ){
             *( (int *) buff ) = (int) odouble;
@@ -11717,7 +11717,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
    len = 0;
 
 /* Store the supplied keyword base name. */
-   if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%s", key ) ) >= 0 ){
+   if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%s", key ) ) >= 0 ){
       len += nc;
    } else {
       len = -1;
@@ -11725,7 +11725,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 
 /* If index c1 has been supplied, append it to the end of the string. */
    if( c1 >= 0 ) {
-      if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%d", c1 ) ) >= 0 ){
+      if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%d", c1 ) ) >= 0 ){
          len += nc;
       } else {
          len = -1;
@@ -11734,7 +11734,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 /* If index c2 has been supplied, append it to the end of the string,
    preceded by an underscore. */
       if( c2 >= 0 ) {
-         if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "_%d", c2 ) ) >= 0 ){
+         if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "_%d", c2 ) ) >= 0 ){
             len += nc;
          } else {
             len = -1;
@@ -11745,7 +11745,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 /* If a co-ordinate version character has been supplied, append it to the end
    of the string. */
    if( s != ' ' ) {
-      if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%c", s ) ) >= 0 ){
+      if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%c", s ) ) >= 0 ){
          len += nc;
       } else {
          len = -1;
@@ -38721,9 +38721,10 @@ static AstMapping *WcsOthers( AstFitsChan *this, FitsStore *store, char s,
 /* Append the CTYPE value to the final Domain value for the primary Frame. */
             if( ckeyval && astChrLen( ckeyval ) > 0 ) {
                if( newdom ) {
-                  char tmpbuf[ 500 ];
+                  char tmpbuf[ 600 ];
                   snprintf( tmpbuf, sizeof(tmpbuf), "%s-%s", newdom, buf2 );
-                  strcpy( buf, tmpbuf );
+                  strncpy( buf, tmpbuf, sizeof(buf) );
+                  buf[ sizeof(buf) - 1 ] = '\0';
                } else {
                   snprintf( buf, sizeof(buf), "%s", buf2 );
                   newdom = buf;

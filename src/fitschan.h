@@ -401,7 +401,7 @@ typedef struct AstFitsChanGlobals {
    AstFitsChanVtab Class_Vtab;
    int Class_Init;
    char GetAttrib_Buff[ AST__FITSCHAN_GETATTRIB_BUFF_LEN + 1 ];
-   char CnvType_Text[ AST__FITSCHAN_FITSCARDLEN + 1 ];
+   char CnvType_Text[ 2*AST__FITSCHAN_FITSCARDLEN + 3 ];
    char CnvType_Text0[ AST__FITSCHAN_FITSCARDLEN + 1 ];
    char CnvType_Text1[ AST__FITSCHAN_FITSCARDLEN + 1 ];
    int Items_Written;
@@ -410,7 +410,7 @@ typedef struct AstFitsChanGlobals {
    int Ignore_Used;
    int Mark_New;
    int CreateKeyword_Seq_Nchars;
-   char FormatKey_Buff[ 10 ];
+   char FormatKey_Buff[ 40 ];
    char FitsGetCom_Sval[ AST__FITSCHAN_FITSCARDLEN + 1 ];
    const char *IsSpectral_Ret;
    char Match_Fmt[ 10 ];
