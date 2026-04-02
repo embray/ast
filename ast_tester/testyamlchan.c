@@ -9,6 +9,7 @@ void stopit( int i, int *status );
 void test1( AstObject *obj, const char *text, int *status );
 void test2( AstObject *obj, const char *text, int *status );
 void test3( AstObject *obj, AstObject *obj2, const char *text, int *status );
+void test4( AstMapping *map, AstMapping *map2, const char *text, int *status );
 
 int chrMatch( const char *a, const char *b ){
    int result = 0;
@@ -115,6 +116,49 @@ int main(){
    if( !astEqual( obj2, obj ) ) stopit( 21, status );
 
    if( !chrMatch( astGetC( ch, "YAMLENCODING" ), "NATIVE") ) stopit( 22, status );
+
+/* Test SphMap round-trip: write a FrameSet containing an AST SphMap to
+   ASDF, read it back, and verify the recovered mapping gives the same
+   numerical results as the original (i.e. keeps the correct units in
+   radians). */
+   {
+      AstYamlChan *ch_rt;
+      AstFrame *frm3d;
+      AstFrame *frm2d;
+      AstFrameSet *sphfs;
+      AstObject *sphfs2;
+      AstMapping *sphmap;
+      AstMapping *sphmap2;
+
+      frm3d = astFrame( 3, "Domain=CART3D" );
+      frm2d = astFrame( 2, "Domain=SPH" );
+      sphmap = (AstMapping *) astSphMap( " " );
+      sphfs = astFrameSet( frm3d, " " );
+      astAddFrame( sphfs, AST__BASE, sphmap, frm2d );
+      sphmap = astAnnul( sphmap );
+      frm3d = astAnnul( frm3d );
+      frm2d = astAnnul( frm2d );
+
+      ch_rt = astYamlChan( NULL, NULL, " " );
+      astSet( ch_rt, "SinkFile=sphmap_roundtrip.asdf" );
+      if( astWrite( ch_rt, sphfs ) != 1 ) stopit( 30, status );
+
+      astClear( ch_rt, "SinkFile" );
+      astSet( ch_rt, "SourceFile=sphmap_roundtrip.asdf" );
+      sphfs2 = astRead( ch_rt );
+      if( !sphfs2 ) stopit( 31, status );
+
+      sphmap  = astGetMapping( sphfs,  AST__BASE, AST__CURRENT );
+      sphmap2 = astGetMapping( (AstFrameSet *) sphfs2, AST__BASE, AST__CURRENT );
+
+      test4( sphmap, sphmap2, "SphMap round-trip test failed", status );
+
+      sphmap  = astAnnul( sphmap );
+      sphmap2 = astAnnul( sphmap2 );
+      sphfs   = astAnnul( sphfs );
+      sphfs2  = astAnnul( sphfs2 );
+      ch_rt   = astAnnul( ch_rt );
+   }
 
    astEnd;
 //   astActivememory( " " );
@@ -271,5 +315,35 @@ void test3( AstObject *obj, AstObject *obj2, const char *text, int *status ){
 }
 
 
+
+void test4( AstMapping *map, AstMapping *map2, const char *text, int *status ){
+/* Three test points as unit (or near-unit) 3-D Cartesian vectors.
+   Layout for astTranN: in[coord * npoint + point], npoint=3, indim=3. */
+   double s = 1.0 / sqrt( 3.0 );
+   double xin[9] = {
+      1.0, 0.0, s,    /* x coords of the 3 points */
+      0.0, 1.0, s,    /* y coords */
+      0.0, 0.0, s     /* z coords */
+   };
+   double xout1[6], xout2[6];  /* 2 output coords x 3 points */
+   int i;
+
+   if( *status != SAI__OK ) return;
+
+   astTranN( map,  3, 3, 3, xin, 1, 2, 3, xout1 );
+   astTranN( map2, 3, 3, 3, xin, 1, 2, 3, xout2 );
+
+   for( i = 0; i < 6; i++ ) {
+      if( fabs( xout1[i] - xout2[i] ) > 1.0E-10 ) {
+         if( *status == SAI__OK )
+            printf( "SphMap round-trip mismatch at output[%d]: %g vs %g\n",
+                    i, xout1[i], xout2[i] );
+         stopit( 32 + i, status );
+         break;
+      }
+   }
+
+   if( *status != SAI__OK ) printf( "%s\n", text );
+}
 
 
