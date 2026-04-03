@@ -20,11 +20,21 @@ The CMake build is the one being actively developed. Use it for testing.
 
 ## Building and testing
 
+For a developer-oriented build with extra warnings and sanitizers enabled:
+
 ```shell
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -B build-dev \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DAST_ENABLE_WARNINGS=ON \
+  -DAST_ENABLE_SANITIZERS=ON
+cmake --build build-dev
+ctest --test-dir build-dev --output-on-failure
 ```
+
+always make sure that any code you add does not trigger new warnings
+and that it also passes the sanitization tests. The AST C source
+is not warnings clean with full warnings enabled but your changes
+should not add to the problem.
 
 ## Architecture
 
