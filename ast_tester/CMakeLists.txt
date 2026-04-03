@@ -86,6 +86,9 @@ ast_add_test(testunitnormmap_c SOURCES testunitnormmap.c)
 ast_add_test(testtrangrid)
 ast_add_test(testmoc)
 ast_add_test(testfitstable)
+ast_add_test(testframeset)
+ast_add_test(testswitchmap)
+ast_add_test(testtime)
 
 # --- Conditional tests ---
 if(HAVE_YAML)
