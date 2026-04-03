@@ -89,6 +89,10 @@ ast_add_test(testfitstable)
 ast_add_test(testframeset)
 ast_add_test(testswitchmap)
 ast_add_test(testtime)
+ast_add_test(testkeymap)
+ast_add_test(testmocchan)
+ast_add_test(testxmlchan_c SOURCES testxmlchan.c)
+ast_add_test(testtable_c SOURCES testtable.c)
 
 # --- Conditional tests ---
 if(HAVE_YAML)
