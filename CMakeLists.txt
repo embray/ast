@@ -26,8 +26,72 @@ option(AST_WITH_YAML "Build with YAML support" ON)
 option(AST_WITH_EXTERNAL_PAL "Use external PAL/ERFA libraries" OFF)
 option(AST_WITH_EXTERNAL_CMINPACK "Use external CMINPACK library" OFF)
 option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
+option(AST_ENABLE_WARNINGS "Enable extra compiler warnings for development builds" OFF)
+option(AST_ENABLE_SANITIZERS "Enable address/undefined sanitizers for supported compilers" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
+
+# ============================================================
+# Developer build options
+# ============================================================
+set(AST_WARNING_FLAGS)
+set(AST_SANITIZER_COMPILE_FLAGS)
+set(AST_SANITIZER_LINK_FLAGS)
+
+if(AST_ENABLE_WARNINGS)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        list(APPEND AST_WARNING_FLAGS
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wformat=2
+            -Wformat-security
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+            -Wstringop-overflow=2
+        )
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        list(APPEND AST_WARNING_FLAGS
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wformat=2
+            -Wformat-security
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+            -Wunsafe-buffer-usage
+        )
+    else()
+        message(WARNING "AST_ENABLE_WARNINGS is ON, but no warning profile is defined for compiler ${CMAKE_C_COMPILER_ID}")
+    endif()
+endif()
+
+if(AST_ENABLE_SANITIZERS)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+        list(APPEND AST_SANITIZER_COMPILE_FLAGS
+            -fno-omit-frame-pointer
+            -fsanitize=address,undefined
+        )
+        list(APPEND AST_SANITIZER_LINK_FLAGS
+            -fno-omit-frame-pointer
+            -fsanitize=address,undefined
+        )
+    else()
+        message(WARNING "AST_ENABLE_SANITIZERS is ON, but sanitizers are not configured for compiler ${CMAKE_C_COMPILER_ID}")
+    endif()
+endif()
+
+function(ast_apply_dev_options target_name)
+    if(AST_WARNING_FLAGS)
+        target_compile_options(${target_name} PRIVATE ${AST_WARNING_FLAGS})
+    endif()
+    if(AST_SANITIZER_COMPILE_FLAGS)
+        target_compile_options(${target_name} PRIVATE ${AST_SANITIZER_COMPILE_FLAGS})
+    endif()
+    if(AST_SANITIZER_LINK_FLAGS)
+        target_link_options(${target_name} PRIVATE ${AST_SANITIZER_LINK_FLAGS})
+    endif()
+endfunction()
 
 # ============================================================
 # System checks (replacing autoconf checks)
@@ -372,6 +436,7 @@ if(AST_BUILD_FORTRAN)
         "${CMAKE_CURRENT_BINARY_DIR}/src"
     )
     target_compile_definitions(astbad PRIVATE HAVE_CONFIG_H)
+    ast_apply_dev_options(astbad)
 
     # Generate AST_PAR from ast_par.source using astbad
     add_custom_command(
@@ -399,6 +464,7 @@ if(NOT AST_WITH_EXTERNAL_PAL)
     )
     target_compile_definitions(ast_pal PRIVATE HAVE_CONFIG_H)
     set_target_properties(ast_pal PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    ast_apply_dev_options(ast_pal)
 endif()
 
 # ============================================================
@@ -419,6 +485,7 @@ if(NOT AST_WITH_EXTERNAL_CMINPACK)
         "${CMAKE_CURRENT_SOURCE_DIR}/cminpack"
     )
     set_target_properties(ast_cminpack PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    ast_apply_dev_options(ast_cminpack)
 endif()
 
 # ============================================================
@@ -625,6 +692,7 @@ set_target_properties(ast PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     C_STANDARD 99
 )
+ast_apply_dev_options(ast)
 
 # libast references symbols (astGFlush, astPutErr_, etc.) that are provided
 # by the satellite libraries (ast_err, ast_grf_*). These are intentionally
@@ -669,6 +737,7 @@ target_include_directories(ast_err PRIVATE ${SATELLITE_INCLUDES})
 target_compile_definitions(ast_err PRIVATE HAVE_CONFIG_H)
 set_target_properties(ast_err PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_err ast_err_h)
+ast_apply_dev_options(ast_err)
 
 # ============================================================
 # Null graphics libraries
@@ -677,21 +746,25 @@ add_library(ast_grf_2.0 STATIC src/grf_2.0.c)
 target_include_directories(ast_grf_2.0 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_2.0 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_grf_2.0 ast_err_h)
+ast_apply_dev_options(ast_grf_2.0)
 
 add_library(ast_grf_3.2 STATIC src/grf_3.2.c)
 target_include_directories(ast_grf_3.2 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_3.2 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_grf_3.2 ast_err_h)
+ast_apply_dev_options(ast_grf_3.2)
 
 add_library(ast_grf_5.6 STATIC src/grf_5.6.c)
 target_include_directories(ast_grf_5.6 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_5.6 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_grf_5.6 ast_err_h)
+ast_apply_dev_options(ast_grf_5.6)
 
 add_library(ast_grf3d STATIC src/grf3d.c)
 target_include_directories(ast_grf3d PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf3d PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_grf3d ast_err_h)
+ast_apply_dev_options(ast_grf3d)
 
 # ============================================================
 # Test program
@@ -709,6 +782,7 @@ if(BUILD_TESTING)
         m
     )
     target_include_directories(ast_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    ast_apply_dev_options(ast_test)
     add_test(NAME ast_test COMMAND ast_test)
     add_subdirectory(ast_tester)
 endif()

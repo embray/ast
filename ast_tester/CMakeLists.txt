@@ -41,6 +41,7 @@ function(ast_add_test name)
     target_include_directories(${name} PRIVATE ${TEST_INCLUDES})
     target_link_libraries(${name} PRIVATE ${TEST_LIBS} ${T_EXTRA_LIBS})
     target_compile_definitions(${name} PRIVATE HAVE_CONFIG_H)
+    ast_apply_dev_options(${name})
     add_test(NAME ${name} COMMAND ${name}
              WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 endfunction()

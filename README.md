@@ -79,6 +79,20 @@ cmake --install build --prefix /usr/local
 The test suite includes 38 tests covering most AST classes. See `PLAN.md`
 for details on test coverage and remaining work.
 
+For a developer-oriented build with extra warnings and sanitizers enabled:
+
+```shell
+cmake -B build-dev \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DAST_ENABLE_WARNINGS=ON \
+  -DAST_ENABLE_SANITIZERS=ON
+cmake --build build-dev
+ctest --test-dir build-dev --output-on-failure
+```
+
+The warning and sanitizer flags are selected automatically for GCC vs
+Clang/AppleClang, so callers only need to enable the options.
+
 ### CMake options
 
 | Option | Default | Description |
@@ -91,6 +105,8 @@ for details on test coverage and remaining work.
 | `AST_WITH_EXTERNAL_PAL` | `OFF` | Use system PAL/ERFA instead of bundled |
 | `AST_WITH_EXTERNAL_CMINPACK` | `OFF` | Use system CMINPACK instead of bundled |
 | `AST_WITH_MEMDEBUG` | `OFF` | Enable memory leak debugging |
+| `AST_ENABLE_WARNINGS` | `OFF` | Enable compiler-specific development warnings |
+| `AST_ENABLE_SANITIZERS` | `OFF` | Enable address and undefined-behavior sanitizers on supported compilers |
 
 ### Using AST from another CMake project
 
