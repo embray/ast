@@ -246,7 +246,7 @@ static AstObject *readast( const char *file, int *status ) {
    if( *status != 0 ) return NULL;
    ch = astChannel( NULL, NULL, " " );
    snprintf( attrib, sizeof(attrib), "SourceFile=%s", file );
-   astSet( ch, attrib );
+   astSet( ch, "%s", attrib );
    obj = astRead( ch );
    astAnnul( ch );
    return obj;
