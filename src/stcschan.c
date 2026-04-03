@@ -6769,8 +6769,14 @@ static int WriteRegion( AstStcsChan *this, AstRegion *reg, AstKeyMap *props,
 /* Get the bounds of the uncertainty. */
             astGetRegionBounds( unca, lbnd, ubnd );
 
-/* The error is half the width of the bounding box. */
-            astMapPut0D( spprops, "ERROR", 0.5*( ubnd[ 0 ] - lbnd[ 0 ] ), NULL );
+/* The error is half the width of the bounding box. Format it using the
+   same precision as any existing Error property value. */
+            error = 0.5*( ubnd[ 0 ] - lbnd[ 0 ] );
+            defdigs = astGetDigits( unca );
+            GetFmt( "ERROR", spprops, 0, defdigs, fmt, status );
+            (void) sprintf( buf, fmt, error );
+            astMapPut0C( spprops, "ERROR", buf, NULL );
+            astMapPut1D( spprops, "DERROR", 1, &error, NULL );
 
 /* Free resources. */
             unca = astAnnul( unca );
@@ -7334,8 +7340,14 @@ static int WriteRegion( AstStcsChan *this, AstRegion *reg, AstKeyMap *props,
 /* Get the bounds of the uncertainty. */
             astGetRegionBounds( unc, lbnd, ubnd );
 
-/* The error is half the width of the bounding box. */
-            astMapPut0D( spprops, "ERROR", 0.5*( ubnd[ 0 ] - lbnd[ 0 ] ), NULL );
+/* The error is half the width of the bounding box. Format it using the
+   same precision as any existing Error property value. */
+            error = 0.5*( ubnd[ 0 ] - lbnd[ 0 ] );
+            defdigs = astGetDigits( spfrm );
+            GetFmt( "ERROR", spprops, 0, defdigs, fmt, status );
+            (void) sprintf( buf, fmt, error );
+            astMapPut0C( spprops, "ERROR", buf, NULL );
+            astMapPut1D( spprops, "DERROR", 1, &error, NULL );
 
 /* Free resources. */
             unc = astAnnul( unc );
@@ -7550,8 +7562,14 @@ static int WriteRegion( AstStcsChan *this, AstRegion *reg, AstKeyMap *props,
 /* Get the bounds of the uncertainty. */
             astGetRegionBounds( unc, lbnd, ubnd );
 
-/* The error is half the width of the bounding box. */
-            astMapPut0D( spprops, "ERROR", 0.5*( ubnd[ 0 ] - lbnd[ 0 ] ), NULL );
+/* The error is half the width of the bounding box. Format it using the
+   same precision as any existing Error property value. */
+            error = 0.5*( ubnd[ 0 ] - lbnd[ 0 ] );
+            defdigs = astGetDigits( spfrm );
+            GetFmt( "ERROR", spprops, 0, defdigs, fmt, status );
+            (void) sprintf( buf, fmt, error );
+            astMapPut0C( spprops, "ERROR", buf, NULL );
+            astMapPut1D( spprops, "DERROR", 1, &error, NULL );
 
 /* Free resources. */
             unc = astAnnul( unc );
@@ -8742,7 +8760,6 @@ AstStcsChan *astLoadStcsChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
 
 
 
