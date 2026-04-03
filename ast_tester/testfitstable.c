@@ -8,23 +8,13 @@
  *    stored into the FitsTable with their full declared length (10 chars,
  *    space-padded). In C, astMapPut1C stores the actual string content
  *    without padding. This means ColumnLenC and ColumnSize return smaller
- *    values in C, and the NAXIS1 header keyword (row width in bytes) is
- *    correspondingly smaller. The Fortran test checks ColumnSize==90 and
- *    ColumnLenC==10 for the STRINGCOL column; the C test skips these
- *    hardcoded size checks and instead verifies the round-trip through
- *    GetColumnData/PutColumnData.
- *
- *  - The final header card-by-card comparison (Fortran errors 16-17) is
- *    replaced by a card count check only, since NAXIS1, TFORM3, and
- *    TDIM3 values depend on the string padding behaviour above.
+ *    values in C, and the NAXIS1/TFORM3/TDIM3 header cards are therefore
+ *    derived from the C string width rather than the Fortran CHARACTER
+ *    width.
  *
  *  - The Fortran test checks for AST__NAXIN when adding an OBJECTTYPE
  *    column; the C API reports AST__BADTYP. This test just checks that
  *    an error is raised and clears it.
- *
- *  TODO: Decide whether the C API should pad strings to a declared
- *  width when populating FitsTable columns, to match FITS BINTABLE
- *  conventions (TFORMn = 'nA' implies fixed-width fields).
  */
 #include "ast.h"
 #include "ast_err.h"
@@ -38,6 +28,16 @@ static void stopit( int *status, const char *text ) {
    if( *status != 0 ) return;
    *status = 1;
    printf( "%s\n", text );
+}
+
+static void expect_card( int *status, const char *got, const char *expected,
+                         const char *text ) {
+   if( *status != 0 ) return;
+   if( strncmp( got, expected, strlen( expected ) ) ) {
+      printf( "got      [%s]\n", got );
+      printf( "expected [%s]\n", expected );
+      stopit( status, text );
+   }
 }
 
 int main() {
@@ -320,15 +320,39 @@ int main() {
    if( astGetI( table, "Nrow" ) != 3 ) stopit( status, "error 14" );
    if( astGetI( table, "Ncolumn" ) != 3 ) stopit( status, "error 15" );
 
-   /* Check updated header has expected number of cards.
-      (Skip card-by-card comparison as string column widths differ
-      between C and Fortran due to string padding.) */
+   /* Check updated header exactly, allowing for the C API's shorter
+      string width in STRINGCOL. */
    header = astGetTableHeader( table );
    icard = 0;
-   while( astFindFits( header, "%f", card, 1 ) ) icard++;
+   while( astFindFits( header, "%f", card, 1 ) ) {
+      int slen = astGetI( table, "ColumnLenC(StringCol)" );
+      int naxis1 = 6 + 8 + 3*slen;
+      char expect_naxis1[81];
+      char expect_tform3[81];
+      char expect_tdim3[81];
+
+      snprintf( expect_naxis1, sizeof( expect_naxis1 ),
+                "NAXIS1  = %20d", naxis1 );
+      snprintf( expect_tform3, sizeof( expect_tform3 ),
+                "TFORM3  = '%dA     '", 3*slen );
+      snprintf( expect_tdim3, sizeof( expect_tdim3 ),
+                "TDIM3   = '(%d,3)   '", slen );
+
+      icard++;
+      if( icard > 20 ) {
+         stopit( status, "error 16" );
+      } else if( icard == 4 ) {
+         expect_card( status, card, expect_naxis1, "error 17" );
+      } else if( icard == 18 ) {
+         expect_card( status, card, expect_tform3, "error 17" );
+      } else if( icard == 20 ) {
+         expect_card( status, card, expect_tdim3, "error 17" );
+      } else {
+         expect_card( status, card, header2[ icard - 1 ], "error 17" );
+      }
+   }
    astAnnul( header );
    if( icard != 20 ) {
-      printf( "Got %d header cards, expected 20\n", icard );
       stopit( status, "error 18" );
    }
 

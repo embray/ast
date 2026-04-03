@@ -9,9 +9,9 @@
  *    length argument is returned; use strlen() if needed.
  *
  *  - astMapGetC (vector-as-string): The C version also takes const char **
- *    and returns a pointer. The Fortran test checks the returned string is
- *    "(Hello     ,          ,  Hello   )" with length 34; in C we compare
- *    with strcmp.
+ *    and returns a pointer. For this test vector the C API returns
+ *    "(Hello, ,  Hello)" with length 17, and the test checks that exact
+ *    rendering.
  *
  *  - astMapGet1C: in C, takes (map, key, l, mxval, &nval, buffer) where
  *    buffer is char[mxval][l] and strings are padded to length l. The
@@ -30,11 +30,10 @@
  *    the returned string with strcmp, which is equivalent since astMapGet0C
  *    returns a properly null-terminated string.
  *
- *  - The A6/A7 checks: After astMapPut1C with cvec strings of width 10,
- *    astMapGet0C returns the first element string. The Fortran test checks
- *    that l=10 and cval(:10) .ne. 'Hello               ' (truncated to 10).
- *    In C, astMapGet0C returns the stored string (padded to 10 chars since
- *    that's the max element length), so we check strlen == 10 and the content.
+ *  - The A6/A7 checks: after astMapPut1C, astMapGet0C returns the first
+ *    element string and astMapLenC reports the maximum stored string
+ *    length. For the test vector used here that maximum length is 7
+ *    ("  Hello"), not the Fortran CHARACTER width of 10.
  *
  *  - MAPCOPY tests that checked inside the .not. ast_isakeymap branch are
  *    actually dead code in Fortran (the branch is taken when NOT a KeyMap).
@@ -708,6 +707,9 @@ int main( void ) {
     * behaviour. We just check the value is "Hello". */
    if( !astMapGet0C( map2, "Fredc", &cval ) ) {
       stopit( status, "Error A5" );
+   } else if( astMapLenC( map2, "Fredc" ) != 7 ) {
+      printf( "%d\n", astMapLenC( map2, "Fredc" ) );
+      stopit( status, "Error A6" );
    } else if( strcmp( cval, "Hello" ) != 0 ) {
       printf( "%s\n", cval );
       stopit( status, "Error A7" );
@@ -836,13 +838,12 @@ int main( void ) {
     * Fortran expects: '(Hello     ,          ,  Hello   )' with l=34 */
    if( !astMapGetC( map2, "Fredc", &cval0 ) ) {
       stopit( status, "Error BB1" );
-   } else {
-      /* The exact format depends on internal implementation.
-       * Check it starts with '(' and contains the elements. */
-      if( cval0[0] != '(' ) {
-         printf( "MapGetC result: '%s'\n", cval0 );
-         stopit( status, "Error BB1b" );
-      }
+   } else if( strlen( cval0 ) != 17 ) {
+      printf( "%zu\n", strlen( cval0 ) );
+      stopit( status, "Error BB2" );
+   } else if( strcmp( cval0, "(Hello, ,  Hello)" ) != 0 ) {
+      printf( "MapGetC result: '%s'\n", cval0 );
+      stopit( status, "Error BB3" );
    }
 
    /* Read single elements of vector entries */

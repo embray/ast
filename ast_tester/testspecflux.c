@@ -3,12 +3,9 @@
  *  Converted from the Fortran test testspecflux.f.
  *
  *  The checkdump round-trip uses astToString/astFromString instead of
- *  Fortran channel source/sink callbacks. The Fortran version compared
- *  the before/after objects using ast_overlap; this C version only
- *  checks that the round-trip read succeeds (non-null result).
- *
- *  Only checks the round-trip read succeeds; astEqual segfaults on
- *  SpecFluxFrame and astOverlap is not applicable (not a Region).
+ *  Fortran channel source/sink callbacks. As in the Fortran original,
+ *  the round-trip check verifies that the serialised and restored object
+ *  preserves the SpecVal attribute.
  */
 #include "ast.h"
 #include <stdio.h>
@@ -29,7 +26,11 @@ static void checkdump( AstObject *obj, const char *text, int *status ) {
    if( !pickle ) { stopit( status, text ); return; }
    result = astFromString( pickle );
    pickle = astFree( pickle );
-   if( !result ) stopit( status, text );
+   if( !result ) {
+      stopit( status, text );
+   } else if( astGetD( obj, "specval" ) != astGetD( result, "specval" ) ) {
+      stopit( status, "Object has changed" );
+   }
 }
 
 int main() {

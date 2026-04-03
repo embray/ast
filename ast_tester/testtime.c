@@ -7,8 +7,7 @@
  *  verifies TimeFrame attributes or Mapping equivalence as appropriate.
  *
  *  The Fortran test had 1-second timing loops for astCurrentTime. This C
- *  version retains them but with a reduced timeout to avoid excessive test
- *  duration.
+ *  version retains those loops.
  *
  *  Error recovery for AST__ATTIN on BEPOCH (errors 21b/21c) uses
  *  astClearStatus instead of Fortran err_annul.
@@ -364,8 +363,14 @@ int main() {
    xin = astCurrentTime( tf1 );
    txt = astFormat( tf1, 1, xin );
    printf( "   Current system time (UTC): %s\n", txt );
-   nc = astUnformat( tf1, 1, "2004-12-31 18:00:10.12", &xout );
-   /* Just check unformat works - exact value depends on current time */
+   {
+      char txt20[21];
+      strncpy( txt20, txt, 20 );
+      txt20[20] = 0;
+      nc = astUnformat( tf1, 1, txt20, &xout );
+      if( nc != 20 || fabs( xout - xin ) > 1.0e-3 )
+         stopit( status, "error 30c" );
+   }
 
    /* Test parsing of J-prefix and B-prefix epochs */
    tf1 = astTimeFrame( "system=jepoch,timeorigin=2005.0" );

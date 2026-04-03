@@ -114,8 +114,12 @@ int main() {
 
    /* Cross-system with wavelength SpecFrame. */
    ff = astFluxFrame( 123.0, sf, "unit=W/m^2/m" );
+   if( strcmp( astGetC( ff, "System" ), "FLXDNW" ) )
+      stopit( status, "Error 20" );
    sf2 = astSpecFrame( "system=wave,unit=nm" );
    ff2 = astFluxFrame( 2437337.06, sf2, "unit=W/m^2/Angstrom" );
+   if( strcmp( astGetC( ff2, "System" ), "FLXDNW" ) )
+      stopit( status, "Error 21" );
    fs = astConvert( ff, ff2, " " );
    if( !fs ) {
       stopit( status, "Error 22" );
