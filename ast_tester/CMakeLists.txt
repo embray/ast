@@ -93,6 +93,9 @@ ast_add_test(testkeymap)
 ast_add_test(testmocchan)
 ast_add_test(testxmlchan_c SOURCES testxmlchan.c)
 ast_add_test(testtable_c SOURCES testtable.c)
+configure_file(stcschan-test1-doc3.ast "${CMAKE_CURRENT_BINARY_DIR}/stcschan-test1-doc3.ast" COPYONLY)
+configure_file(stcschan-test1-doc3-props.ast "${CMAKE_CURRENT_BINARY_DIR}/stcschan-test1-doc3-props.ast" COPYONLY)
+ast_add_test(teststcschan_c SOURCES teststcschan.c)
 
 # --- Conditional tests ---
 if(HAVE_YAML)

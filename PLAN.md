@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 37 tests passing
+## Current status: 38 tests passing
 
 | Phase | Status |
 |-------|--------|
@@ -20,11 +20,11 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 2: Medium Fortran conversions | **Complete** (6 tests) |
 | Phase 2 Batch 3: Larger Fortran conversions | **Complete** (5 tests) |
 | Phase 2 Batch 4: Checkdump-pattern tests | **Complete** (4 tests) |
-| Phase 2 Batch 5: Channel-callback tests | **In progress** (3 of 6 tests) |
+| Phase 2 Batch 5: Channel-callback tests | **In progress** (4 of 6 tests) |
 | Phase 2 remaining batches | Not started |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (37 total)
+### Test inventory (38 total)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -33,13 +33,13 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (26):**
+**Fortran tests converted to C (27):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
 - Batch 3: testchebymap, testunitnormmap, testtrangrid, testmoc, testfitstable
 - Batch 4: testframeset, testswitchmap, testtime, testkeymap
-- Batch 5: testmocchan, testxmlchan, testtable
+- Batch 5: testmocchan, testxmlchan, testtable, teststcschan
 
 ## Phase 1 details (complete)
 
@@ -114,10 +114,7 @@ Key issues:
 
 ## Phase 2 remaining work
 
-### Unconverted Fortran tests (6 of 32)
-
-**Tests with complex channel callbacks (need more work):**
-- teststcschan.f (727 lines) — StcsChan
+### Unconverted Fortran tests (5 of 32)
 - testfitschan.f (1290 lines) — FitsChan
 - teststc.f (1858 lines) — STC
 
@@ -145,4 +142,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 37 tests, all passing.
+Shows 38 tests, all passing.
