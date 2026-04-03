@@ -49,7 +49,7 @@ int main() {
    int64_t kval;
    int64_t null;
    int wasset, hasnull;
-   char card[80];
+   char card[81];
    signed char bytes[6];
    const char *text[3];
    float rval;
