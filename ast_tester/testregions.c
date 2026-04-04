@@ -5,8 +5,8 @@
 #include "ast.h"
 
 static void stopit( int *status, const char *text );
-static void checkdump( AstObject *obj, const char *text, int *status );
-static int hasframeset( AstObject *reg, int *status );
+static void checkdump( void *obj, const char *text, int *status );
+static int hasframeset( void *reg, int *status );
 static void checkConvex( int *status );
 static void checkRemoveRegions( int *status );
 static void checkInterval( int *status );
@@ -55,7 +55,6 @@ int main(void) {
 static void generalChecks( int *status ) {
    AstFrame* frm1 = NULL;
    AstFrame* frm2 = NULL;
-   AstFrame* frm3 = NULL;
    AstRegion* reg1 = NULL;
    AstRegion* reg2 = NULL;
    AstRegion* reg3 = NULL;
@@ -139,9 +138,6 @@ static void checkInterval( int *status ) {
    AstInterval* int2 = NULL;
    AstInterval* int3 = NULL;
    AstInterval* int4 = NULL;
-   AstInterval* int5 = NULL;
-   AstFrame* frm4 = NULL;
-   AstMapping* map = NULL;
    int outperm[6] = {0};
    int inperm[6] = {0};
    void* pm = 0;
@@ -1479,7 +1475,7 @@ static void sink1( const char *line ) {
    }
 }
 
-static int hasframeset( AstObject *reg, int *status ) {
+static int hasframeset( void *reg, int *status ) {
    AstChannel *ch = NULL;
    if( *status != 0 ) return 0;
    fsfound_global = 0;
@@ -1498,20 +1494,20 @@ static void stopit( int *status, const char *text ) {
 
 static void checkPointList( int *status ) {
    const char *fwd[1], *inv[1];
-   AstFrame* frm = NULL;
+   void *frm = NULL;
    AstRegion* reg = NULL;
    AstRegion* reg2 = NULL;
    AstRegion* reg3 = NULL;
    AstRegion* reg4 = NULL;
-    AstMapping* mm = NULL;
-   AstMapping* map = NULL;
+   void *mm = NULL;
+   void *map = NULL;
    int mdata[17] = {0};
    int lbnd[1] = { 0 };
    int ubnd[1] = { 0 };
    int nbad = 0;
    AstRegion* unc = NULL;
    double pnts[3], xin[3], xout[3], ina, inb, outa, outb;
-   
+
    if( *status != 0 ) return;
    astBegin;
    frm = astSpecFrame( " " );
@@ -1617,9 +1613,8 @@ static void checkCircle( int *status ) {
    void* f2 = 0;
    void* f3 = 0;
    int npoint = 0;
-   int j = 0;
-   double p1[4],p2[4],xin[2],yin[2],xout[2],yout[2],                 p3[3],rad,zin[2],zout[2],pp1[3],pp2[3],                 lbnd[2],ubnd[2], mesh[3][250],centre[2],                 radius;
-   char cards[10][80], sys[40];
+   double p1[4],p2[4],xin[2],yin[2],xout[2],yout[2],p3[3],rad,pp1[3],pp2[3],lbnd[2],ubnd[2], mesh[3][250],centre[2],radius;
+   char cards[10][80];
 
    double in[3][2], out[3][2];
    strcpy(cards[0], "CTYPE1  = 'RA---TAN'");
@@ -1910,23 +1905,18 @@ static void checkEllipse( int *status ) {
    int i = 0;
    void* fs = 0;
    AstFrame* frm1 = NULL;
-   void* fs2 = 0;
    void* mm = 0;
    AstEllipse* ell3 = NULL;
-   AstEllipse* ell4 = NULL;
    AstRegion* reg = NULL;
    void* unc = 0;
    void* f1 = 0;
-   void* f2 = 0;
    void* f3 = 0;
-   void* f4 = 0;
-   void* f5 = 0;
    AstMapping* map = NULL;
    int perm[2] = {0};
    double p1[2],p2[2],p3[2],p4[2],pp1[2],pp2[2];
-   double q1[2],q2[2],q3[2],q4[2],lbnd[2],ubnd[2];
-   double q1b[2],q2b[2],q3b[2],q4b[2];
-   double p1b[2],p2b[2],p3b[2],p4b[2],matrix[4];
+   double q1[2],q2[2],q3[2],lbnd[2],ubnd[2];
+   double q1b[2],q2b[2],q3b[2];
+   double p1b[2],p2b[2],p3b[2],matrix[4];
    char cards[10][80];
    double xin[4],yin[4],xout[4],yout[4],rad;
 
@@ -2388,10 +2378,10 @@ static void checkCmpRegion( int *status ) {
    astEnd;
    printf("%s\n", "CmpRegion tests failed");
 }
-// 
+//
 //   Tests the dump function, the loader, and the astOverlap method.
-// 
-static void checkdump( AstObject *obj, const char *text, int *status ) {
+//
+static void checkdump( void *obj, const char *text, int *status ) {
    char *s1 = NULL;
    char *s2 = NULL;
    AstObject *obj2 = NULL;
