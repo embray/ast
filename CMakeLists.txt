@@ -59,7 +59,6 @@ if(AST_ENABLE_WARNINGS)
             -Wformat-security
             -Wstrict-prototypes
             -Wmissing-prototypes
-            -Wunsafe-buffer-usage
         )
     else()
         message(WARNING "AST_ENABLE_WARNINGS is ON, but no warning profile is defined for compiler ${CMAKE_C_COMPILER_ID}")
