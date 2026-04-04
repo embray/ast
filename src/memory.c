@@ -4123,8 +4123,8 @@ void *astStore_( void *ptr, const void *data, size_t size, int *status ) {
    necessary) and copy the data into it. */
          new = astMalloc( size );
          if ( astOK ) {
-            if ( ptr ) ptr = astFree( ptr );
             (void) memcpy( new, data, size );
+            if ( ptr ) ptr = astFree( ptr );
 
 /* If memory allocation failed, do not free the old memory but return
    a pointer to it. */
