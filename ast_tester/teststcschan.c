@@ -260,7 +260,7 @@ static void test1( int *status ) {
    AstKeyMap *km;
    double lbnd[4], ubnd[4];
    double xin[7], yin[7], xout[7], yout[7];
-   int nobj, i;
+   int nobj;
 
    if( *status != 0 ) return;
    astBegin;
