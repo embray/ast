@@ -19,7 +19,7 @@ static void checkNullRegion( int *status );
 static void generalChecks( int *status );
 static void checkCmpRegion( int *status );
 static void checkPointList( int *status );
-static void sink1( int *status );
+static void sink1( const char *line );
 
 int main(void) {
    int status_value=0;
@@ -857,7 +857,7 @@ static void checkBox( int *status ) {
    astSetC( box1, "system", "icrs");
    astPermAxes( box1, perm); t1 = (void *)astFormat( frm1, 1, 0.25e0);
    astAnnul( frm1); t2 = (void *)astFormat( box1, 1, 0.25e0);
-   if( strcmp(t1, t2) != 0 ) stopit( status,       "ast_format is different for frm1 and box1" ); i = (void *)astUnformat( box1, 1, t2, &v2);
+   if( strcmp(t1, t2) != 0 ) stopit( status,       "ast_format is different for frm1 and box1" ); i = astUnformat( box1, 1, t2, &v2);
    if( fabs( v2 - 0.25 )  >  1.0E-10 ) {
    stopit( status, "ast_unformat failed for box1" );
 }
@@ -1441,9 +1441,9 @@ static void checkBox( int *status ) {
    p1[(2 )-1] = 150.0;
    p2[(1 )-1] = 150.0;
    p2[(2 )-1] = 170.0; box1 = (void *)astBox( bfrm, 0, p1, p2, AST__NULL, " ");
-   astGetRegionMesh( box1,  0 , 250, 2, npoint, grid);
+   astGetRegionMesh( box1,  0 , 250, 2, &npoint, (double *) grid );
    if( npoint  !=  176 ) {
-   printf("%s\n", npoint);
+   printf("%d\n", npoint);
    stopit( status, "Box: Error mesh 3" );
 }
    if( status  !=  0 ) goto label_991;
@@ -1454,7 +1454,7 @@ static void checkBox( int *status ) {
    stopit( status, "Box: Error mesh 2" );
 }
 }
-   astGetRegionMesh( box1,  1 , 250, 2, npoint, grid);
+   astGetRegionMesh( box1,  1 , 250, 2, &npoint, (double *) grid );
    if( npoint  !=  198 )    stopit( status, "Box: Error mesh 4" );
    if( status  !=  0 ) goto label_991;
    for (i = 1; i <= npoint; i++) {
@@ -1468,13 +1468,6 @@ static void checkBox( int *status ) {
    astEnd;
    printf("%s\n", "Box tests failed");
 }
-static void stopit(  status, text  ) {
-   char const char *text;
-   if( status  !=  0 ) return;
-   status = sai__error;
-   printf("%s\n", text);
-}
-static void checkdump( AstObject *obj, const char *text, int *status );
 static int fsfound_global = 0;
 static int done_global = 0;
 
@@ -1487,17 +1480,22 @@ static void sink1( const char *line ) {
 }
 
 static int hasframeset( AstObject *reg, int *status ) {
-   void* ch = 0;
+   AstChannel *ch = NULL;
    if( *status != 0 ) return 0;
    fsfound_global = 0;
    done_global = 0;
-   ch = (void *)astChannel( NULL, sink1, " " );
+   ch = astChannel( NULL, sink1, " " );
    astWrite( ch, reg );
    astAnnul( ch );
    return fsfound_global;
 }
 
+static void stopit( int *status, const char *text ) {
+   if( *status != 0 ) return;
+   *status = 1;
+   printf( "%s\n", text );
 }
+
 static void checkPointList( int *status ) {
    const char *fwd[1], *inv[1];
    AstFrame* frm = NULL;
@@ -1505,25 +1503,29 @@ static void checkPointList( int *status ) {
    AstRegion* reg2 = NULL;
    AstRegion* reg3 = NULL;
    AstRegion* reg4 = NULL;
-   void* mm = 0;
+    AstMapping* mm = NULL;
    AstMapping* map = NULL;
-   int mdata[-1:15] = {0};
-   int lbnd = 0;
-   int ubnd = 0;
+   int mdata[17] = {0};
+   int lbnd[1] = { 0 };
+   int ubnd[1] = { 0 };
    int nbad = 0;
-   void* unc = 0;
-   double pnts[3], xin[3],xout[3], acc, ina, inb, outa,                 outb;
+   AstRegion* unc = NULL;
+   double pnts[3], xin[3], xout[3], ina, inb, outa, outb;
    
    if( *status != 0 ) return;
-   astBegin; frm = (void *)astSpecFrame( " ");
+   astBegin;
+   frm = astSpecFrame( " " );
    pnts[(1)-1]=0.0;
-   pnts[(2)-1]=1.0E-5; unc = (void *)astBox( frm, 0, pnts[(1)-1], pnts[(2)-1], AST__NULL, " ");
+   pnts[(2)-1]=1.0E-5;
+   unc = (AstRegion *) astBox( frm, 0, pnts, pnts + 1, AST__NULL, " " );
    pnts[(1)-1]=1.0;
-   pnts[(2)-1]=1.1; reg = (void *)astPointList( frm, 2, 1, (double *)3, pnts, unc, " ");
+   pnts[(2)-1]=1.1;
+   reg = (AstRegion *) astPointList( frm, 2, 1, 3, pnts, unc, " " );
    checkdump( reg, "checkdump reg", status );
    if( astOverlap( reg, reg)  !=  5 ) {
    stopit( status,                "PointList: self is not identical with self" );
-} reg2 = (void *)astCopy( reg);
+}
+   reg2 = (AstRegion *) astCopy( reg );
    astNegate( reg2);
    checkdump( reg2, "checkdump reg2", status );
    if( astOverlap( reg, reg2)  !=  6 ) {
@@ -1549,50 +1551,55 @@ static void checkPointList( int *status ) {
    stopit( status, "PointList: Error 6" );
 }
    fwd[0] = "y=x**2";
-   inv[0] = "x=y**0.5"; mm = (void *)astMathMap( 1, 1, 1, fwd, 1, inv, " "); reg3 = (void *)astMapRegion( reg, mm, astFrame(1," ")); reg4 = (void *)astSimplify( reg3);
+   inv[0] = "x=y**0.5";
+   mm = astMathMap( 1, 1, 1, fwd, 1, inv, " " );
+   reg3 = (AstRegion *) astMapRegion( reg, mm, astFrame( 1, " " ) );
+   reg4 = (AstRegion *) astSimplify( reg3 );
    checkdump( reg4, "checkdump reg4", status );
    xin[(1 )-1] = 1.21;
    xin[(2 )-1] = 1.5;
    astTran1( reg4, 2, xin,  1 , xout);
    if( xout[(1 )-1]  !=  1.21 ) {
-   printf("%s\n", xout[(1)-1], " (should be 1.21)");
+   printf("%g (should be 1.21)\n", xout[(1)-1] );
    stopit( status, "PointList: Error 7" );
    } else if( xout[(2 )-1]  !=  AST__BAD ) {
-   printf("%s\n", xout[(2)-1], " (should be bad)");
+   printf("%g (should be bad)\n", xout[(2)-1] );
    stopit( status, "PointList: Error 8" );
 }
-   lbnd = -1;
-   ubnd = 15;
+   lbnd[0] = -1;
+   ubnd[0] = 15;
    ina = 1.01;
    inb = 1.11;
    outa = 2.0;
-   outb = 7.0; map = (void *)astWinmap( 1, ina, inb, outa, outb, " "); nbad = (void *)astMaski( reg, map,  1 , 1, lbnd, ubnd, mdata, 2);
+   outb = 7.0;
+   map = astWinMap( 1, &ina, &inb, &outa, &outb, " " );
+   nbad = astMaskI( reg, map,  1 , 1, lbnd, ubnd, mdata, 2 );
    if( nbad  !=  2 ) {
-   printf("%s\n", "nbad = ",nbad);
+   printf("nbad = %d\n", nbad );
    stopit( status, "Above value should be 2" );
 }
-   if( mdata[(1)-1]  !=  0 ) {
-   printf("%s\n", "mdata[(1)-1] = ",mdata[(1)-1]);
+   if( mdata[1 - lbnd[0]]  !=  0 ) {
+   printf("mdata(1) = %d\n", mdata[1 - lbnd[0]] );
    stopit( status, "Above value should be 0" );
 }
-   if( mdata[(2)-1]  !=  2 ) {
-   printf("%s\n", "mdata[(2)-1] = ",mdata[(2)-1]);
+   if( mdata[2 - lbnd[0]]  !=  2 ) {
+   printf("mdata(2) = %d\n", mdata[2 - lbnd[0]] );
    stopit( status, "Above value should be 2" );
 }
-   if( mdata[(3)-1]  !=  0 ) {
-   printf("%s\n", "mdata[(3)-1] = ",mdata[(3)-1]);
+   if( mdata[3 - lbnd[0]]  !=  0 ) {
+   printf("mdata(3) = %d\n", mdata[3 - lbnd[0]] );
    stopit( status, "Above value should be 0" );
 }
-   if( mdata[(6)-1]  !=  0 ) {
-   printf("%s\n", "mdata[(6)-1] = ",mdata[(6)-1]);
+   if( mdata[6 - lbnd[0]]  !=  0 ) {
+   printf("mdata(6) = %d\n", mdata[6 - lbnd[0]] );
    stopit( status, "Above value should be 0" );
 }
-   if( mdata[(7)-1]  !=  2 ) {
-   printf("%s\n", "mdata[(7)-1] = ",mdata[(7)-1]);
+   if( mdata[7 - lbnd[0]]  !=  2 ) {
+   printf("mdata(7) = %d\n", mdata[7 - lbnd[0]] );
    stopit( status, "Above value should be 2" );
 }
-   if( mdata[(8)-1]  !=  0 ) {
-   printf("%s\n", "mdata[(8)-1] = ",mdata[(8)-1]);
+   if( mdata[8 - lbnd[0]]  !=  0 ) {
+   printf("mdata(8) = %d\n", mdata[8 - lbnd[0]] );
    stopit( status, "Above value should be 0" );
 }
    astEnd;
@@ -1626,7 +1633,8 @@ static void checkCircle( int *status ) {
    strcpy(cards[8], "CROTA2  = 0.0");
    if( *status != 0 ) return;
    astBegin;
-//  Test 2D circles. fc = (void *)astFitsChan( NULL, NULL, " ");
+//  Test 2D circles.
+   fc = astFitsChan( NULL, NULL, " " );
    for (i = 1; i <= 8; i++) {
    astPutFits( fc, cards[i-1],  0);
 }
@@ -1651,17 +1659,17 @@ static void checkCircle( int *status ) {
    if( fabs(lbnd[(2)-1]-(1.560000052675599))  >  1.0E-6 )    stopit( status, "Circle: Error AA6" );
    if( fabs(ubnd[(1)-1]-(6.283185307179586))  >  1.0E-6 )    stopit( status, "Circle: Error AA7" );
    if( fabs(ubnd[(2)-1]-(1.5707963267948966))  >  1.0E-6 )    stopit( status, "Circle: Error AA8" );
-   astGetRegionMesh( cir1,  1 , 0, 0, npoint, 0);
+   astGetRegionMesh( cir1,  1 , 0, 0, &npoint, NULL );
    if( npoint  !=  200 )    stopit( status, "Circle: Error mesh 1" );
-   astGetRegionMesh( cir1,  1 , 250, 3, npoint, mesh);
+   astGetRegionMesh( cir1,  1 , 250, 3, &npoint, (double *) mesh );
    for (i = 1; i <= npoint; i++) {
    p2[(1)-1] = mesh[(1)-1][(i)-1];
    p2[(2)-1] = mesh[(2)-1][(i)-1];
    if( fabs( astDistance( frm1, p1, p2) - 0.01 )  >        1.0E-6 ) stopit( status, "Circle: Error mesh 2" );
 }
-   astGetRegionMesh( cir1,  0 , 250, 3, npoint, mesh);
+   astGetRegionMesh( cir1,  0 , 250, 3, &npoint, (double *) mesh );
    if( npoint  !=  201 ) {
-   printf("%s\n", npoint);
+   printf("%d\n", npoint);
    stopit( status, "Circle: Error mesh 3" );
 }
    for (i = 1; i <= npoint; i++) {
@@ -1673,7 +1681,7 @@ static void checkCircle( int *status ) {
    p1[(2 )-1] = 1.3962634;
    p2[(1 )-1] = 0.8;
    p2[(2 )-1] = 0.8; cir1 = (void *)astCircle( frm1, 0, p1, p2, AST__NULL, " ");
-   checkdump( cir1, "checkdump cir1", status ); rad = (void *)astDistance( cir1, p1, p2);
+   checkdump( (AstObject *) cir1, "checkdump cir1", status ); rad = astDistance( cir1, p1, p2 );
    astOffset( frm1, p1, p2, rad*0.999, p3);
    xin[(1)-1] = p3[(1)-1];
    yin[(1)-1] = p3[(2)-1];
@@ -1712,7 +1720,7 @@ static void checkCircle( int *status ) {
    p1[(1 )-1] = 1.2217305;
    p1[(2 )-1] = 1.3962634;
    p2[(1 )-1] = 1.2218;
-   p2[(2 )-1] = 1.3963; cir1 = (void *)astCircle( frm1, 0, p1, p2, unc, " "); rad = (void *)astDistance( cir1, p1, p2);
+   p2[(2 )-1] = 1.3963; cir1 = (void *)astCircle( frm1, 0, p1, p2, unc, " "); rad = astDistance( cir1, p1, p2 );
    astOffset( frm1, p1, p2, rad*0.999, p3);
    xin[(1)-1] = p3[(1)-1];
    yin[(1)-1] = p3[(2)-1];
@@ -1738,8 +1746,8 @@ static void checkCircle( int *status ) {
    if( xout[(2)-1]  !=  AST__BAD ) stopit( status,                                          "Circle: Error 7b" );
    if( yout[(2)-1]  !=  AST__BAD ) stopit( status,                                          "Circle: Error 8b" ); cir2 = (void *)astCopy( cir1);
    astSetC( cir2, "system", "galactic");
-   checkdump( cir2, "checkdump cir2", status ); cir2 = (void *)astSimplify( cir2);
-   if( hasframeset( cir2,status ) ) stopit( status,                  "Circle: error 9b" );
+   checkdump( (AstObject *) cir2, "checkdump cir2", status ); cir2 = (void *)astSimplify( cir2);
+   if( hasframeset( (AstObject *) cir2,status ) ) stopit( status,                  "Circle: error 9b" );
    if( astOverlap( cir1, cir2)  !=  5 ) stopit(status,                                          "Circle: Error 10" );
    if( astOverlap( cir2, cir1)  !=  5 ) stopit(status,                                          "Circle: Error 11" );
    p1[(1 )-1] = 1.2217305;
@@ -1799,7 +1807,7 @@ static void checkCircle( int *status ) {
    p2[(1 )-1] = 0.0;
    p2[(2 )-1] = -1.0;
    p2[(3 )-1] = -2.0; cir1 = (void *)astCircle( frm1, 0, p1, p2, unc, " ");
-   checkdump( cir1, "checkdump sph1", status ); rad = (void *)astDistance( cir1, p1, p2);
+   checkdump( (AstObject *) cir1, "checkdump sph1", status ); rad = astDistance( cir1, p1, p2 );
    astOffset( frm1, p1, p2, rad*0.999, p3);
    in[(1)-1][(1)-1] = p3[(1)-1];
    in[(2)-1][(1)-1] = p3[(2)-1];
@@ -1870,7 +1878,7 @@ static void checkCircle( int *status ) {
    p2[(2 )-1] = 1.0;
    p2[(3 )-1] = 0.0; cir2 = (void *)astCircle( frm1, 0, p1, p2, unc, " ");
    if( astOverlap( cir1, cir2)  !=  4 ) {
-   printf("%s\n", astOverlap( cir1, cir2)," should be 4 ");
+   printf("%d should be 4\n", astOverlap( cir1, cir2) );
    stopit(status, "Sphere: Error 15" );
 }
    p1[(1 )-1] = 2.000001;
@@ -1932,7 +1940,7 @@ static void checkEllipse( int *status ) {
    strcpy(cards[7], "CDELT2  = 5.55555555555555E-4");
    strcpy(cards[8], "CROTA2  = 0.0");
    if( *status != 0 ) return;
-   astBegin; f1 = (void *)astSkyFrame( "system=fk4"); f3 = (void *)astCmpFrame( astPickaxes( f1, 1, 1, map),                   astSpecFrame( "system=wave,unit=um"),                   " ");
+   astBegin; f1 = (void *)astSkyFrame( "system=fk4"); f3 = (void *)astCmpFrame( astPickAxes( f1, 1, (const int[]) { 1 }, &map),                   astSpecFrame( "system=wave,unit=um"),                   " ");
    perm[(1)-1]=2;
    perm[(2)-1]=1;
    astPermAxes( f3, perm);
@@ -1959,8 +1967,8 @@ static void checkEllipse( int *status ) {
    if( yout[(3)-1]  !=  yin[(3)-1] ) stopit( status, "Ellipse: Cmp 6");
    if( xout[(4)-1]  !=  AST__BAD ) stopit( status,                                         "Ellipse: Cmp 7" );
    if( yout[(4)-1]  !=  AST__BAD ) stopit( status,                                         "Ellipse: Cmp 8" );
-   checkdump( ell1, "checkdump ell1 cmp", status ); ell2 = (void *)astSimplify( ell1);
-   checkdump( ell2, "checkdump ell2 cmp", status );
+   checkdump( (AstObject *) ell1, "checkdump ell1 cmp", status ); ell2 = (void *)astSimplify( ell1);
+   checkdump( (AstObject *) ell2, "checkdump ell2 cmp", status );
    if( astOverlap( ell1, ell2)  !=  5 ) stopit(status,                                          "ellipse: Error 5 cmp" ); fc = (void *)astFitsChan( NULL, NULL, " ");
    for (i = 1; i <= 10; i++) {
    astPutFits( fc, cards[i-1],  0);
@@ -1972,12 +1980,12 @@ static void checkEllipse( int *status ) {
    p2[(2 )-1] = 1.470796;
    p3[(1 )-1] = 2.9217305;
    p3[(2 )-1] = 1.370796; ell1 = (void *)astEllipse( frm1, 0, p1, p2, p3, AST__NULL, " ");
-   checkdump( ell1, "checkdump ell1", status );
+   checkdump( (AstObject *) ell1, "checkdump ell1", status );
    astGetRegionBounds( ell1, lbnd, ubnd);
    if( fabs( lbnd[(1)-1] )  >  1.0E-10 ) stopit( status,                                               "Error b1" );
    if( fabs( lbnd[(2)-1] - 1.19059777 )  >  1.0E-6 )           stopit( status, "Error b2" );
    if( fabs( ubnd[(1)-1] - 6.28318531 )  >  1.0E-6 )           stopit( status, "Error b3" );
-   if( fabs( ubnd[(2)-1] - 1.57079633 )  >  1.0E-6 )           stopit( status, "Error b4" ); rad = (void *)astDistance( ell1, p1, p2);
+   if( fabs( ubnd[(2)-1] - 1.57079633 )  >  1.0E-6 )           stopit( status, "Error b4" ); rad = astDistance( ell1, p1, p2 );
    astOffset( frm1, p1, p2, rad*0.999, p4);
    xin[(1)-1] = p4[(1)-1];
    yin[(1)-1] = p4[(2)-1];
@@ -1999,7 +2007,7 @@ static void checkEllipse( int *status ) {
    if( xout[(1)-1]  !=  xin[(1)-1] ) stopit( status,                                         "Ellipse: Error 1b");
    if( yout[(1)-1]  !=  yin[(1)-1] ) stopit( status,                                         "Ellipse: Error 2b");
    if( xout[(2)-1]  !=  AST__BAD ) stopit( status,                                         "Ellipse: Error 3b" );
-   if( yout[(2)-1]  !=  AST__BAD ) stopit( status,                                         "Ellipse: Error 4b" ); rad = (void *)astDistance( ell1, p1, p3);
+   if( yout[(2)-1]  !=  AST__BAD ) stopit( status,                                         "Ellipse: Error 4b" ); rad = astDistance( ell1, p1, p3 );
    astOffset( frm1, p1, p3, rad*0.999, p4);
    xin[(1)-1] = p4[(1)-1];
    yin[(1)-1] = p4[(2)-1];
@@ -2039,7 +2047,7 @@ static void checkEllipse( int *status ) {
    q2[(1)-1] = xout[(2)-1];
    q2[(2)-1] = yout[(2)-1];
    q3[(1)-1] = xout[(3)-1];
-   q3[(2)-1] = yout[(3)-1]; frm1 = (void *)astGetFrame( fs, AST__BASE); rad = (void *)astDistance( frm1, q1, q2);
+   q3[(2)-1] = yout[(3)-1]; frm1 = (void *)astGetFrame( fs, AST__BASE); rad = astDistance( frm1, q1, q2 );
    astOffset( frm1, q1, q2, rad*1.95, q1b);
    q2b[(1 )-1] = q2[(1 )-1]  + ( q1b[(1 )-1] - q1[(1 )-1] );
    q2b[(2 )-1] = q2[(2 )-1]  + ( q1b[(2 )-1] - q1[(2 )-1] );
@@ -2110,10 +2118,10 @@ static void checkEllipse( int *status ) {
    matrix[(2)-1] = 0.5003;
    matrix[(3)-1] = -1.0006;
    matrix[(4)-1] = 0.866; mm = (void *)astMatrixMap( 2, 2, 0, matrix, " "); ell2 = (void *)astMapRegion( ell1, mm, frm1);
-   checkdump( ell2, "checkdump ell2", status );
-   if( hasframeset( ell2, status ) ) stopit( status,                  "Ellipse: error 15" );
+   checkdump( (AstObject *) ell2, "checkdump ell2", status );
+   if( hasframeset( (AstObject *) ell2, status ) ) stopit( status,                  "Ellipse: error 15" );
    astInvert( mm); ell3 = (void *)astMapRegion( ell2, mm, frm1);
-   if( hasframeset( ell3,status ) ) stopit( status,                  "Ellipse: error 16" );
+   if( hasframeset( (AstObject *) ell3,status ) ) stopit( status,                  "Ellipse: error 16" );
    if( astOverlap( ell1, ell3)  !=  5 ) stopit(status,                                          "ellipse: Error 17" ); frm1 = (void *)astFrame( 2, " ");
    pp1[(1 )-1] = 0.0;
    pp1[(2 )-1] = 0.0;
@@ -2158,22 +2166,22 @@ static void checkEllipse( int *status ) {
    printf("%s\n", "Ellipse tests failed");
 }
 static void checkNullRegion( int *status ) {
-   void* f1 = 0;
-   void* f2 = 0;
-   void* f3 = 0;
-   int nr = 0;
+   AstSkyFrame* f1 = NULL;
+   AstFrame* f2 = NULL;
+   AstCmpFrame* f3 = NULL;
+   AstRegion* nr = NULL;
    AstCircle* cir = NULL;
    int i = 0;
    int j = 0;
-   int nr2 = 0;
+   AstRegion* nr2 = NULL;
    int res = 0;
    int64_t lbnd_in8[2] = {0};
    int64_t ubnd_in8[2] = {0};
    double p1[4],p2[4],rin[5][5];
 
    if( *status != 0 ) return;
-   astBegin; f1 = (void *)astSkyFrame( " "); f2 = (void *)astFrame( 2, " "); f3 = (void *)astCmpFrame( f1, f2, " "); nr = (void *)astNullRegion( f3, AST__NULL, " ");
-   checkdump( nr, "checkdump NullRegion:nr", status );
+   astBegin; f1 = astSkyFrame( " " ); f2 = astFrame( 2, " " ); f3 = astCmpFrame( f1, f2, " " ); nr = (AstRegion *) astNullRegion( f3, AST__NULL, " " );
+   checkdump( (AstObject *) nr, "checkdump NullRegion:nr", status );
    p1[(1 )-1] = 1.0;
    p1[(2 )-1] = 1.0;
    p1[(3 )-1] = 3.0;
@@ -2181,8 +2189,8 @@ static void checkNullRegion( int *status ) {
    p2[(1 )-1] = 1.01;
    p2[(2 )-1] = 1.02;
    p2[(3 )-1] = 3.01;
-   p2[(4 )-1] = 3.01; cir = (void *)astCircle( nr, 0, p1, p2, AST__NULL, " ");
-   checkdump( cir, "checkdump NullRegion:cir", status );
+   p2[(4 )-1] = 3.01; cir = astCircle( nr, 0, p1, p2, AST__NULL, " " );
+   checkdump( (AstObject *) cir, "checkdump NullRegion:cir", status );
    if( astOverlap( cir, nr)  !=  1 ) stopit(status,                                          "NullRegion: Error 1" );
    if( astOverlap( nr, cir)  !=  1 ) stopit(status,                                          "NullRegion: Error 2" );
    if( astOverlap( nr, nr)  !=  5 ) stopit(status,                                          "NullRegion: Error 3" );
@@ -2190,9 +2198,11 @@ static void checkNullRegion( int *status ) {
    if( astOverlap( cir, nr)  !=  2 ) stopit(status,                                          "NullRegion: Error 4" );
    if( astOverlap( nr, cir)  !=  3 ) stopit(status,                                          "NullRegion: Error 5" );
    if( astOverlap( nr, nr)  !=  5 ) stopit(status,                                          "NullRegion: Error 6" );
-   astSet( nr, "system(1)=FK4"); nr2 = (void *)astSimplify( nr);
-   astSet( nr2, "system(1)=ICRS"); nr = (void *)astSimplify( nr2);
-   if( hasframeset( nr, status ) ) stopit( status,                                          "NullRegion: error 7" );
+   astSet( nr, "system(1)=FK4");
+   nr2 = (AstRegion *) astSimplify( nr );
+   astSet( nr2, "system(1)=ICRS");
+   nr = (AstRegion *) astSimplify( nr2 );
+   if( hasframeset( (AstObject *) nr, status ) ) stopit( status,                                          "NullRegion: error 7" );
    lbnd_in8[0] = 1;
    lbnd_in8[1] = 1;
    ubnd_in8[(1)-1] = 5;
@@ -2201,28 +2211,31 @@ static void checkNullRegion( int *status ) {
    for (j = 1; j <= 5; j++) {
    rin[(i)-1][(j)-1]=1.0;
 }
-} nr = (void *)astNullRegion( f2, AST__NULL, "negated=1"); res = (void *)astMask8d( nr, AST__NULL,  0 , 2, lbnd_in8, ubnd_in8,                  rin, VAL__BADD);
+}
+   nr = (AstRegion *) astNullRegion( f2, AST__NULL, "negated=1");
+   res = astMask8D( nr, AST__NULL,  0 , 2, lbnd_in8, ubnd_in8, (double *) rin, AST__BAD );
    if( res  !=  0 ) {
-   printf("%s\n", "NullRegion:Res is ",res);
+   printf("NullRegion:Res is %d\n", res);
    stopit( status, "res should be 0" );
 }
    for (i = 1; i <= 5; i++) {
    for (j = 1; j <= 5; j++) {
    if( rin[(i)-1][(j)-1]  !=  1.0 ) {
-   printf("%s\n", "rin(",j,",",i,") = ",rin[(i)-1][(j)-1]);
+   printf("rin(%d,%d) = %g\n", j, i, rin[(i)-1][(j)-1] );
    stopit( status, "Above value should be 1.0" );
 }
 }
 }
-   astNegate( nr); res = (void *)astMask8d( nr, AST__NULL,  0 , 2, lbnd_in8, ubnd_in8,                  rin, VAL__BADD);
+   astNegate( nr);
+   res = astMask8D( nr, AST__NULL,  0 , 2, lbnd_in8, ubnd_in8, (double *) rin, AST__BAD );
    if( res  !=  25 ) {
-   printf("%s\n", "NullRegion:Res is ",res);
+   printf("NullRegion:Res is %d\n", res);
    stopit( status, "res should be 25" );
 }
    for (i = 1; i <= 5; i++) {
    for (j = 1; j <= 5; j++) {
-   if( rin[(i)-1][(j)-1]  !=  VAL__BADD ) {
-   printf("%s\n", "rin(",j,",",i,") = ",rin[(i)-1][(j)-1]);
+   if( rin[(i)-1][(j)-1]  !=  AST__BAD ) {
+   printf("rin(%d,%d) = %g\n", j, i, rin[(i)-1][(j)-1] );
    stopit( status, "Above value should be BAD" );
 }
 }
@@ -2379,14 +2392,25 @@ static void checkCmpRegion( int *status ) {
 //   Tests the dump function, the loader, and the astOverlap method.
 // 
 static void checkdump( AstObject *obj, const char *text, int *status ) {
+   char *s1 = NULL;
+   char *s2 = NULL;
+   AstObject *obj2 = NULL;
    if( *status != 0 ) return;
-   // Simplified checkdump
-}
-
-   next = next + ll;
-}
-
-   next = next + ll;
+   s1 = astToString( obj );
+   if( !s1 ) {
+      stopit( status, text );
+      return;
+   }
+   obj2 = astFromString( s1 );
+   if( !obj2 ) {
+      s1 = astFree( s1 );
+      stopit( status, text );
+      return;
+   }
+   s2 = astToString( obj2 );
+   if( !s2 || strcmp( s1, s2 ) != 0 ) stopit( status, text );
+   if( s1 ) s1 = astFree( s1 );
+   if( s2 ) s2 = astFree( s2 );
 }
 static void checkPrism( int *status ) {
    void* f1 = 0;
@@ -2414,7 +2438,7 @@ static void checkPrism( int *status ) {
    ubnd[(1 )-1] = 5800.0; r2 = (void *)astInterval( f2, lbnd, ubnd, AST__NULL, " "); r4 = (void *)astPrism( r1, r2, " ");
    if( astOverlap( r3, r4)  !=  3 ) stopit( status,                                                    "Prism 2" );
    if( astOverlap( r4, r3)  !=  2 ) {
-   printf("%s\n", astOverlap( r4, r3)," should be 2");
+   printf("%d should be 2\n", astOverlap( r4, r3) );
    stopit( status, "Prism 3" );
 }
    lbnd[(1 )-1] = 5500.0;
@@ -2478,17 +2502,18 @@ static void checkPrism( int *status ) {
    printf("%s\n", "Prism tests failed");
 }
 static void checkRemoveRegions( int *status ) {
-   int sf1 = 0;
-   int sf2 = 0;
+   AstSkyFrame* sf1 = NULL;
+   AstSkyFrame* sf2 = NULL;
    AstRegion* reg = NULL;
-   void* fs = 0;
+   AstFrameSet* fs = NULL;
    AstMapping* map = NULL;
-   void* fs2 = 0;
+   AstFrameSet* fs2 = NULL;
    double cen[2], ixin[2], iyin[2], gxin[2], gyin[2],                 xout[2], yout[2];
-   if( status  !=  0 ) return;
-   astBegin; sf1 = (void *)astSkyFrame( "System=ICRS");
+   double rad[1];
+   if( *status  !=  0 ) return;
+   astBegin; sf1 = astSkyFrame( "System=ICRS");
    cen[(1)-1] = 0.0;
-   cen[(2)-1] = 0.0; reg = (void *)astCircle( sf1, 1, cen, 0.001e0, AST__NULL, " ");
+   cen[(2)-1] = 0.0; rad[0] = 0.001e0; reg = (AstRegion *) astCircle( sf1, 1, cen, rad, AST__NULL, " " );
    ixin[(1)-1] = 0.0;
    iyin[(1)-1] = 0.0;
    ixin[(2)-1] = 0.01;
@@ -2499,11 +2524,11 @@ static void checkRemoveRegions( int *status ) {
    } else if( fabs( xout[(1)-1] - ixin[(1)-1] )  >  1.0E-10  ||          fabs( yout[(1)-1] - iyin[(1)-1] )  >  1.0E-10 ) {
    stopit( status, "RemoveRegions test 2 failed" );
    } else if( xout[(2)-1]  !=  AST__BAD  ||  yout[(2)-1]  !=  AST__BAD ) {
-   printf("%s\n", xout[(2)-1], ixin[(2)-1]);
-   printf("%s\n", yout[(2)-1], iyin[(2)-1]);
+   printf("%g %g\n", xout[(2)-1], ixin[(2)-1]);
+   printf("%g %g\n", yout[(2)-1], iyin[(2)-1]);
    stopit( status, "RemoveRegions test 3 failed" );
-} sf2 = (void *)astSkyFrame( "System=Galactic"); fs = (void *)astConvert( sf1, sf2, " ");
-   astTran2( fs, 2, ixin, iyin,  1 , gxin, gyin); fs2 = (void *)astFrameSet( sf2, " ");
+} sf2 = astSkyFrame( "System=Galactic"); fs = (AstFrameSet *) astConvert( sf1, sf2, " ");
+   astTran2( fs, 2, ixin, iyin,  1 , gxin, gyin); fs2 = (AstFrameSet *) astFrameSet( sf2, " " );
    astAddFrame( fs2, AST__BASE, astUnitMap( 2, " "),                   sf2); fs = (void *)astConvert( fs2, reg, " "); map = (void *)astGetMapping( fs, AST__BASE, AST__CURRENT);
    astTran2( map, 2, gxin, gyin,  1 , xout, yout);
    if( xout[(1)-1]  ==  AST__BAD  ||  yout[(1)-1]  ==  AST__BAD ) {
@@ -2511,10 +2536,10 @@ static void checkRemoveRegions( int *status ) {
    } else if( fabs( xout[(1)-1] - ixin[(1)-1] )  >  1.0E-10  ||            fabs( yout[(1)-1] - iyin[(1)-1] )  >  1.0E-10 ) {
    stopit( status, "RemoveRegions test 5 failed" );
    } else if( xout[(2)-1]  !=  AST__BAD  ||  yout[(2)-1]  !=  AST__BAD ) {
-   printf("%s\n", xout[(2)-1], ixin[(2)-1]);
-   printf("%s\n", yout[(2)-1], iyin[(2)-1]);
+   printf("%g %g\n", xout[(2)-1], ixin[(2)-1]);
+   printf("%g %g\n", yout[(2)-1], iyin[(2)-1]);
    stopit( status, "RemoveRegions test 6 failed" );
-} fs2 = (void *)astRemoveregions( fs); map = (void *)astGetMapping( fs2, AST__BASE, AST__CURRENT);
+} fs2 = (AstFrameSet *) astRemoveRegions( fs ); map = (void *)astGetMapping( fs2, AST__BASE, AST__CURRENT);
    astTran2( map, 2, gxin, gyin,  1 , xout, yout);
    if( xout[(1)-1]  ==  AST__BAD  ||  yout[(1)-1]  ==  AST__BAD ) {
    stopit( status, "RemoveRegions test 7 failed" );
@@ -2548,8 +2573,8 @@ static void checkConvex( int *status ) {
    array[1-1 + (4-1)*nx] = 1.0;
    array[1-1 + (6-1)*nx] = 1.0;
    array[2-1 + (6-1)*nx] = 1.0;
-   array[6-1 + (6-1)*nx] = 1.0; poly = (void *)astConvexr( 1.0, AST__EQ, array, lbnd, ubnd,  0);
-   astGetRegionPoints( poly, 10, 2, npoint, points);
+   array[6-1 + (6-1)*nx] = 1.0; poly = (void *)astConvexF( 1.0f, AST__EQ, array, lbnd, ubnd,  0);
+   astGetRegionPoints( poly, 10, 2, &npoint, (double *) points );
    if( npoint  !=  7 ) stopit( status, "Convex 1" );
    if( points[(1)-1][(1)-1]  !=  -3) stopit( status, "Convex 2" );
    if( points[(2)-1][(1)-1]  !=  3) stopit( status, "Convex 3" );
