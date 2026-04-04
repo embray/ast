@@ -22584,12 +22584,14 @@ static int Match( const char *test, const char *temp, int maxfld, int *fields,
    in the same order that they occur in the template. */
    if( !match_nentry ){
       nfret = ( *nfld < maxfld ) ? (*nfld) : maxfld;
-      match_pa = fields;
-      match_pb = fields + nfret - 1;
-      for( i = 0; i < nfret/2; i++ ){
-         tmp = *match_pa;
-         *(match_pa++) = *match_pb;
-         *(match_pb--) = tmp;
+      if( nfret > 0 ) {
+         match_pa = fields;
+         match_pb = fields + nfret - 1;
+         for( i = 0; i < nfret/2; i++ ){
+            tmp = *match_pa;
+            *(match_pa++) = *match_pb;
+            *(match_pb--) = tmp;
+         }
       }
    }
 
@@ -45189,7 +45191,6 @@ static void ListFC( AstFitsChan *this, const char *ttl ) {
    this->card = cardo;
 }
 */
-
 
 
 

@@ -767,9 +767,13 @@ static void Sink1( void *data, size_t nc, const char *buf, int *status ){
    this = (AstMocChan *) data;
 
 /* "buf" is not null terminated, so we need to create a null terminated
-   copy. */
-   line = astStore( NULL, buf, nc + 1 );
-   line[ nc ] = 0;
+   copy. We cannot use astStore here because it would memcpy nc+1 bytes
+   from a buffer that is only valid for nc bytes. */
+   line = astMalloc( nc + 1 );
+   if( astOK ) {
+      memcpy( line, buf, nc );
+      line[ nc ] = 0;
+   }
 
 /* Write this null-terminated line ut through the sink function. */
    astPutNextText( this, line );
@@ -2069,9 +2073,6 @@ AstMocChan *astLoadMocChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
-
-
 
 
 

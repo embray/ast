@@ -138,8 +138,17 @@ f     The PermMap class does not define any new routines beyond those
    element of the permutation array, and "maxperm" is one more than the
    maximum value allowed in the permutation array (i.e. the number of
    PermMap outputs if "perms" is inperm, or PermMap inputs if "perms" is
-   outperm). */
+   outperm). Use this only when the caller already knows that "i" is within
+   the allocated permutation array bounds. */
 #define PERMVAL( perms, i, maxperm ) ( perms ? perms[ i ] : (  i < maxperm ? i : -1 ))
+
+/* Like PERMVAL, but also guards against "i" being outside the allocated
+   permutation array length. Use this when comparing or otherwise probing
+   effective permutation arrays whose storage may not match the current
+   Nin/Nout values directly (for instance after taking account of Invert). */
+#define SAFE_PERMVAL( perms, i, nperm, maxperm ) \
+        ( (perms) ? ( ( (i) < (nperm) ) ? (perms)[ i ] : -1 ) : \
+                    ( (i) < (maxperm) ? (i) : -1 ) )
 
 /* Module Variables. */
 /* ================= */
@@ -263,10 +272,14 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
    int p1;
    int p2;
    int result;
-   int that_inp_len;
-   int that_outp_len;
-   int this_inp_len;
-   int this_outp_len;
+   int that_inp_nel;
+   int that_inp_valmax;
+   int that_outp_nel;
+   int that_outp_valmax;
+   int this_inp_nel;
+   int this_inp_valmax;
+   int this_outp_nel;
+   int this_outp_valmax;
 
 /* Initialise. */
    result = 0;
@@ -295,45 +308,33 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
          nin_that = astGetNin( that );
          nout_that = astGetNout( that );
 
-/* Get pointers to the effective inperm and outperm array for each PermMap.
-   If the Invert flags of the two PermMaps are not equal, we swap the
-   arrays for the second PermMap in order to take account of the relative
-   inversion of the second PermMap. */
-         this_inp = this->inperm;
-         this_outp = this->outperm;
-
-         if(  astGetInvert( this ) ) {
-            this_inp_len =  nout;
-            this_outp_len =  nin;
+/* Get pointers to the effective inverse-transformation ("inperm") and
+   forward-transformation ("outperm") arrays for each PermMap, taking
+   account of their current Invert flags. The Nin/Nout values obtained
+   above already reflect the current Invert state. */
+         if( astGetInvert( this ) ) {
+            this_inp = this->outperm;
+            this_outp = this->inperm;
          } else {
-            this_inp_len =  nin;
-            this_outp_len =  nout;
+            this_inp = this->inperm;
+            this_outp = this->outperm;
          }
+         this_inp_nel = nin;
+         this_outp_nel = nout;
+         this_inp_valmax = nout;
+         this_outp_valmax = nin;
 
-         if( astGetInvert( this ) != astGetInvert( that ) ) {
+         if( astGetInvert( that ) ) {
             that_inp = that->outperm;
             that_outp = that->inperm;
-
-            if(  astGetInvert( that ) ) {
-               that_inp_len =  nin_that;
-               that_outp_len =  nout_that;
-            } else {
-               that_inp_len =  nout_that;
-               that_outp_len =  nin_that;
-            }
-
          } else {
             that_inp = that->inperm;
             that_outp = that->outperm;
-
-            if(  astGetInvert( that ) ) {
-               that_inp_len =  nout_that;
-               that_outp_len =  nin_that;
-            } else {
-               that_inp_len =  nin_that;
-               that_outp_len =  nout_that;
-            }
          }
+         that_inp_nel = nin_that;
+         that_outp_nel = nout_that;
+         that_inp_valmax = nout_that;
+         that_outp_valmax = nin_that;
 
 /* Loop round every PermMap input. */
          for( i = 0; i < nin; i++ ) {
@@ -343,8 +344,8 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
    output with the corresponding index. A negative integer "p" value means
    the input is fed a constant value stored at index (-p-1) in the
    associated constants array. */
-            p1 = PERMVAL( this_inp, i, this_outp_len );
-            p2 = PERMVAL( that_inp, i, that_outp_len );
+            p1 = SAFE_PERMVAL( this_inp, i, this_inp_nel, this_inp_valmax );
+            p2 = SAFE_PERMVAL( that_inp, i, that_inp_nel, that_inp_valmax );
 
 /* If the "p" values differ, we may have evidence that the PermMaps are
    not equivalent. */
@@ -372,8 +373,8 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
    inputs. */
          if( result ) {
             for( i = 0; i < nout; i++ ) {
-               p1 = PERMVAL( this_outp, i, this_inp_len );
-               p2 = PERMVAL( that_outp, i, that_inp_len );
+               p1 = SAFE_PERMVAL( this_outp, i, this_outp_nel, this_outp_valmax );
+               p2 = SAFE_PERMVAL( that_outp, i, that_outp_nel, that_outp_valmax );
 
                if( p1 != p2 ) {
                   if( p1 >= 0 || p2 >= 0 ) {
@@ -3194,9 +3195,5 @@ int *astGetOutPerm_( AstPermMap *this, int *status ){
    if( !astOK ) return NULL;
    return (**astMEMBER(this,PermMap,GetOutPerm))( this, status );
 }
-
-
-
-
 
 

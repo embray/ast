@@ -2112,6 +2112,8 @@ f        The global status.
 /* Local Variables: */
    char key[ AST__MXCOLKEYLEN + 1 ]; /* Current cell key string */
    char **carray;    /* Pointer to array of null terminated string pointers */
+   double dval;      /* Current double value */
+   float fval;       /* Current float value */
    int irow;         /* Index of value being copied */
    int iel;          /* Index of current element */
    int nel;          /* No. of elements per value */
@@ -2197,7 +2199,9 @@ f        The global status.
 
       } else if(  type == AST__DOUBLETYPE ){
          for( iel = 0; iel < nel; iel++ ) {
-            if( astISFINITE( ((double *)pin)[ iel ] ) ) {
+            memcpy( &dval, (const char *) pin + iel*sizeof( dval ),
+                    sizeof( dval ) );
+            if( astISFINITE( dval ) ) {
                astMapPut1D( this, key, nel, pin, NULL );
                break;
             }
@@ -2205,7 +2209,9 @@ f        The global status.
 
       } else if(  type == AST__FLOATTYPE ){
          for( iel = 0; iel < nel; iel++ ) {
-            if( astISFINITE( ((double *)pin)[ iel ] ) ) {
+            memcpy( &fval, (const char *) pin + iel*sizeof( fval ),
+                    sizeof( fval ) );
+            if( astISFINITE( fval ) ) {
                astMapPut1F( this, key, nel, pin, NULL );
                break;
             }
@@ -3183,8 +3189,6 @@ void astPutColumnData_( AstFitsTable *this, const char *column, int clen,
    if ( !astOK ) return;
    (**astMEMBER(this,FitsTable,PutColumnData))(this,column,clen,size,coldata,status);
 }
-
-
 
 
 
