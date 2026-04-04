@@ -98,7 +98,7 @@ Key issues:
 - **testzoommap.c**: Simplified immutability error recovery (checks `!astOK`
   rather than specific `AST__IMMUT` code).
 
-- **testfitschan.c**: FITS card padding ignored during assertions to match Fortran string comparison rules. An `astConvert` check on a sparse TAB WCS triggers an internal libast ASAN heap-use-after-free bug, so it is skipped to pass sanitization tests.
+- **testfitschan.c**: FITS card padding ignored during assertions to match Fortran string comparison rules. Fixed a `heap-use-after-free` bug in `astStore_` (memory.c) exposed by AddressSanitizer during `astConvert`.
 
 - **testkeymap.c**: C uses 0-based indexing for `astMapKey`, `astMapGetElem*`,
   and `astMapPutElem*` (Fortran uses 1-based). Fortran `elem=0` (append)

@@ -28,9 +28,9 @@
  *  - astFindFits(), astGetFitsI(), astGetFitsK(), astGetFitsS() etc. are
  *    used as boolean expressions (they return int via astINVOKE/astRetV_).
  *
- *  - astConvert triggers an internal AddressSanitizer heap-use-after-free
- *    bug in libast (memory.c:4127) when matching sparse.ast frames. The
- *    conversion test is skipped here to allow the C test suite to pass.
+ *  - astConvert no longer triggers an internal AddressSanitizer bug, as
+ *    the underlying heap-use-after-free issue in libast (memory.c:4127)
+ *    has been fixed.
  *
  *  - The sip.head test was referenced via SourceFile attribute in Fortran;
  *    we do the same in C.
@@ -694,9 +694,7 @@ static void checktab( int *status ) {
          AstFrameSet *fssp = (AstFrameSet *)sparseobj;
          AstFitsChan *fcsp;
          AstFrameSet *fs2sp;
-#if 0
          AstFrameSet *fs3sp;
-#endif
          double xs[3], ys[3], y2s[3];
          int ii;
 
@@ -719,10 +717,6 @@ static void checktab( int *status ) {
 
          astInvert( fssp );
          astInvert( fs2sp );
-#if 0
-         /* astConvert triggers an internal heap-use-after-free in libast 
-          * when matching these frames under AddressSanitizer.
-          * This block is skipped to avoid the crash. */
          {
             AstFrameSet *fssp_clone = astClone(fssp);
             AstFrameSet *fs2sp_clone = astClone(fs2sp);
@@ -732,7 +726,6 @@ static void checktab( int *status ) {
          }
          if( !fs3sp )
             stopit( 1039, " ", status );
-#endif
 
 
          {
@@ -775,9 +768,7 @@ static void checktab( int *status ) {
                stopit( 1042, " ", status );
          }
 
-#if 0
          if( fs3sp ) astAnnul( fs3sp );
-#endif
          if( fs2sp ) astAnnul( fs2sp );
          astAnnul( fcsp );
          astAnnul( fssp );
