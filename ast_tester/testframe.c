@@ -3,7 +3,7 @@
 #include "ast.h"
 #include "ast_err.h"
 
-int main() {
+int main( void ) {
    int status = SAI__OK;
    astWatch( &status );
 

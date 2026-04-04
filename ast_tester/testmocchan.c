@@ -38,7 +38,7 @@ static void sink( const char *line ) {
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstMoc *moc;

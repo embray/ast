@@ -13,7 +13,7 @@ static void stopit( int i, int *status ) {
    *status = 1;
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int perm[3];

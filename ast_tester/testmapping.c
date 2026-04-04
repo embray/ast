@@ -5,6 +5,7 @@
  */
 #include "ast.h"
 #include <stdio.h>
+#include <string.h>
 
 static void stopit( int *status, const char *text ) {
    if( *status != 0 ) return;
@@ -12,7 +13,7 @@ static void stopit( int *status, const char *text ) {
    printf( "%s\n", text );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstPolyMap *pm;
@@ -27,8 +28,7 @@ int main() {
                   3.0, 2, 0, 1,
                   3.0, 1, 0, 2 };
 
-   int i;
-   for( i = 0; i < 20; i++ ) coeff[i] = c[i];
+   memcpy( coeff, c, sizeof( coeff ) );
 
    astWatch( status );
    astBegin;

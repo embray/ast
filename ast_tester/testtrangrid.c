@@ -111,7 +111,7 @@ static void testmap( AstMapping *map, int itest, double tol, int *status ) {
    testgridpair( map, 0.0, 4, itest * 10 + 6, status );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    double mat[4], a1[2], a2[2], b1[2], b2[2], zero = 0.0;

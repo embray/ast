@@ -33,12 +33,12 @@ static void checkdump( AstObject *obj, const char *text, int *status ) {
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    double xin, xout, yin, yout;
    int perm[2];
-   AstSpecFrame *sf, *sf2;
+   AstSpecFrame *sf;
    AstFluxFrame *ff, *ff2;
    AstSpecFluxFrame *sff, *sff2, *csff;
    AstFrameSet *fs;

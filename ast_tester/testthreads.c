@@ -11,7 +11,7 @@ typedef struct MyData {
    int lock;
 } MyData;
 
-int main(){
+int main( void ){
    pthread_t thread1, thread2;
    MyData data1, data2;
    int status = SAI__OK;
@@ -113,5 +113,4 @@ void *worker( void *ptr ) {
    if( data->lock ) astUnlock( data->obj, 1 );
    return NULL;
 }
-
 

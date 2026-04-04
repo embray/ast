@@ -26,7 +26,7 @@ static AstObject *readobj( const char *file, int *status ) {
    return obj;
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int in[7], out[7];

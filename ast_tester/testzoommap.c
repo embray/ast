@@ -17,11 +17,10 @@ static void stopit( int *status, const char *text ) {
    printf( "%s\n", text );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstZoomMap *zm;
-   AstCmpMap *cm;
 
    astWatch( status );
    astBegin;
@@ -48,7 +47,7 @@ int main() {
    }
 
    /* Placing the ZoomMap in a CmpMap makes it immutable. */
-   cm = astCmpMap( zm, astUnitMap( 1, " " ), 1, " " );
+   astCmpMap( zm, astUnitMap( 1, " " ), 1, " " );
 
    if( !astTest( zm, "Zoom" ) ) {
       stopit( status, "Error 7" );

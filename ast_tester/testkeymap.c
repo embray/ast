@@ -344,7 +344,7 @@ int main( void ) {
    AstKeyMap *map, *map2, *map3, *map1, *km2;
    AstObject *aval;
    AstObject *avec[4];
-   int ival, nval, i, iat;
+   int ival, nval, i;
    int64_t kval;
    int64_t kvec[4];
    const char *cval;
@@ -891,12 +891,12 @@ int main( void ) {
    map = astKeyMap( " " );
 
    for( i = 1; i <= 200; i++ ) {
-      iat = sprintf( key, "Fred%d", i );
+      snprintf( key, sizeof( key ), "Fred%d", i );
       astMapPut0I( map, key, i, " " );
    }
 
    for( i = 201; i <= 499; i++ ) {
-      iat = sprintf( key, "Fred%d", i );
+      snprintf( key, sizeof( key ), "Fred%d", i );
       astMapPut0K( map, key, (int64_t)i, " " );
    }
 

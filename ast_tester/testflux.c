@@ -31,7 +31,7 @@ static void checkdump( AstObject *obj, const char *text, int *status ) {
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    double xin, xout;

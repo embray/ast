@@ -83,7 +83,7 @@ static AstObject *xmlread( int ifil, int *status ) {
    return obj;
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int ifmt, i, ok;

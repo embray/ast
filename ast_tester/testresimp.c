@@ -11,7 +11,7 @@
 #include "winmap.h"
 #include "mapping.h"
 
-int main(){
+int main( void ){
    int status_value = 0;
    int *status = &status_value;
    double shift;

@@ -6,7 +6,7 @@
 #include "object.h"
 #include "axis.h"
 
-int main() {
+int main( void ) {
    int _status = SAI__OK;
    int* status = &_status;
    astWatch( status );

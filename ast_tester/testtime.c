@@ -63,11 +63,11 @@ static void checkdump( AstObject *obj, const char *text, int *status ) {
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    const char *txt;
-   double xin, xout, xout2, ct, ctl, origin;
+   double xin, xout, xout2, ctl, origin;
    int n, nc;
    AstTimeFrame *tf, *tf1, *tf2;
    AstFrameSet *fs;

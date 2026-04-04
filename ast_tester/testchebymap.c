@@ -31,7 +31,7 @@ static void checkdump( AstObject *obj, int *status ) {
    remove( "fred.tmp" );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int i, j, nco;

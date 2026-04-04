@@ -66,7 +66,7 @@ static void checkdump( AstObject *obj, const char *text, int *status ) {
    pickle = astFree( pickle );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int outperm[2], inperm[2], i, oc, mc;

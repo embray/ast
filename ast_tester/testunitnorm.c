@@ -5,7 +5,7 @@
 #define astCLASS testunitnorm
 #include "unit.h"
 
-int main() {
+int main( void ) {
    int _status = SAI__OK;
    int* status = &_status;
    astWatch( status );

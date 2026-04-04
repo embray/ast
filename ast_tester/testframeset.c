@@ -46,7 +46,7 @@ static AstFrameSet *checkdump( AstFrameSet *obj, int *status ) {
    return (AstFrameSet *)result;
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    double ina[2], inb[2], outa[2], outb[2], xin, yin, xout, yout;

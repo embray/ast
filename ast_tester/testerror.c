@@ -3,9 +3,9 @@
 #define ERRVAL -1234
 static int flag;
 
-void myPutErr( int status_value, const char *message );
+static void myPutErr( int status_value, const char *message );
 
-int main(){
+int main( void ){
    double a[2] = {0.0,0.0};
 
 /* Initialise the flag that indicates if the error handler has been
@@ -17,7 +17,7 @@ int main(){
 
 /* Generate an error by making a ShiftMap with a negative number of axes.
    The error handler will set the flag to a special value. */
-   AstShiftMap *map = astShiftMap( -1, a, " " );
+   astShiftMap( -1, a, " " );
 
 /* Clear the error status. */
    astClearStatus;
@@ -39,6 +39,8 @@ int main(){
 
 }
 
-void myPutErr( int status_value, const char *message ) {
+static void myPutErr( int status_value, const char *message ) {
+   (void) status_value;
+   (void) message;
    flag = ERRVAL;
 }

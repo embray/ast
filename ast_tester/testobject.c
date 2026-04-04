@@ -1,24 +1,24 @@
 #include "ast.h"
+#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 
 /* Helper to extract basename from a file path, since __FILE__ may
    include a directory prefix in out-of-source builds. */
 static const char *baseName( const char *path ) {
-   const char *p;
+   static char buffer[ 1024 ];
    if( !path ) return path;
-   p = strrchr( path, '/' );
-   return p ? p + 1 : path;
+   snprintf( buffer, sizeof( buffer ), "%s", path );
+   return basename( buffer );
 }
 
-int main(){
+int main( void ){
    const char *routine;
    const char *file;
    int i;
    int line;
    char *pickle1;
    char *pickle2;
-   int sf_line = __LINE__ + 1;
    AstSkyFrame *sf = astSkyFrame( " " );
    int bf_line = __LINE__ + 1;
    AstFrame *bf = astFrame( 2, "Domain=SKY" );

@@ -13,7 +13,7 @@ static void stopit( int *status, const char *text ) {
    printf( "%s\n", text );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstSkyFrame *sf1, *sf2;

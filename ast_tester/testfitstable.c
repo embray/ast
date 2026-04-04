@@ -40,19 +40,17 @@ static void expect_card( int *status, const char *got, const char *expected,
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstFitsTable *table, *table2;
-   AstFitsChan *header, *head;
+   AstFitsChan *header;
    int dims[7], ival, icard;
    int64_t kval;
    int64_t null;
    int wasset, hasnull;
    char card[81];
-   signed char bytes[6];
    const char *text[3];
-   float rval;
    int colsize;
 
    const char *header1[] = {

@@ -89,7 +89,7 @@ static void makeimage( int dims[2], float **pdata, AstFrameSet **iwcs,
    astAnnul( fc );
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    AstMoc *moc, *moc2, *moc3;
@@ -101,7 +101,7 @@ int main() {
    int64_t npix;
    size_t size;
    char *cval, buf[100];
-   int there, json;
+   int json;
    int dims[2];
    float *ipdata;
    AstFrameSet *iwcs;
@@ -169,13 +169,13 @@ int main() {
    if( ln != 832 ) stopit( "Error 9", status );
 
    fc = astGetMocHeader( moc );
-   there = astGetFitsI( fc, "NAXIS1", &ival );
+   astGetFitsI( fc, "NAXIS1", &ival );
    if( ival != 4 ) stopit( "Error 10", status );
-   there = astGetFitsI( fc, "NAXIS2", &ival );
+   astGetFitsI( fc, "NAXIS2", &ival );
    if( ival != ln ) stopit( "Error 11", status );
-   there = astGetFitsS( fc, "TFORM1", &cval );
+   astGetFitsS( fc, "TFORM1", &cval );
    if( strcmp( cval, "1J" ) ) stopit( "Error 12", status );
-   there = astGetFitsI( fc, "MOCORDER", &ival );
+   astGetFitsI( fc, "MOCORDER", &ival );
    if( ival != 8 ) stopit( "Error 13", status );
 
    datacheck( moc, "Error 13A", status );

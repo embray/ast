@@ -154,7 +154,7 @@ static void testsimplify( int *status ) {
    }
 }
 
-int main() {
+int main( void ) {
    int status_value = 0;
    int *status = &status_value;
    int nin, i, good;

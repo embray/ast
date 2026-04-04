@@ -9,10 +9,87 @@
 #define npos 10
 #define tol 1.0E-11
 
-int main(){
+static int read_values( FILE *in, int nval, double values[ static 1 ],
+                        const char *name ) {
+   int i;
+   for( i = 0; i < nval; i++ ) {
+      if( fscanf( in, "%lf", &values[ i ] ) != 1 ) {
+         astError( AST__INTER, "Failed to read %s[%d]", name, i );
+         return 0;
+      }
+   }
+   return 1;
+}
+
+static void check_coeffs( int errcode, const double got[ static nx*ny ],
+                          const double expected[ static nx*ny ] ) {
+   int i;
+   for( i = 0; i < nx*ny; i++ ) {
+      if( got[ i ] != expected[ i ] ) {
+         astError( AST__INTER, "Error %d: %d %.20g %.20g", errcode, i,
+                   got[ i ], expected[ i ] );
+         return;
+      }
+   }
+}
+
+static void check_forward( const double uexp[ static npos ],
+                           const double vexp[ static npos ],
+                           const double uout[ static npos ],
+                           const double vout[ static npos ] ) {
+   int i;
+   for( i = 0; i < npos && astOK; i++ ) {
+      if( uexp[ i ] == AST__BAD ) {
+         if( uout[ i ] != AST__BAD ) {
+            astError( AST__INTER, "Error 1: %d : %.20g != AST__BAD",
+                      i, uout[ i ] );
+         }
+      } else if( vexp[ i ] == AST__BAD ) {
+         if( vout[ i ] != AST__BAD ) {
+            astError( AST__INTER, "Error 2: %d : %.20g != AST__BAD",
+                      i, vout[ i ] );
+         }
+      } else if( uout[ i ] == AST__BAD ) {
+         astError( AST__INTER, "Error 3: %d : AST__BAD != %.20g",
+                   i, uexp[ i ] );
+      } else if( vout[ i ] == AST__BAD ) {
+         astError( AST__INTER, "Error 4: %d : AST__BAD != %.20g",
+                   i, vexp[ i ] );
+      } else if( fabs( uout[ i ] - uexp[ i ] ) > tol*fabs( uexp[ i ] ) ) {
+         astError( AST__INTER, "Error 5: %d : %.20g != %.20g",
+                   i, uout[ i ], uexp[ i ] );
+      } else if( fabs( vout[ i ] - vexp[ i ] ) > tol*fabs( vexp[ i ] ) ) {
+         astError( AST__INTER, "Error 6: %d : %.20g != %.20g",
+                   i, vout[ i ], vexp[ i ] );
+      }
+   }
+}
+
+static void check_reverse( const double xin[ static npos ], const double yin[ static npos ],
+                           const double uout[ static npos ], const double vout[ static npos ],
+                           const double xrec[ static npos ], const double yrec[ static npos ] ) {
+   int i;
+   for( i = 0; i < npos && astOK; i++ ) {
+      if( uout[ i ] != AST__BAD && vout[ i ] != AST__BAD ) {
+         if( fabs( xrec[ i ] - xin[ i ] ) > tol*fabs( xin[ i ] ) ||
+             fabs( yrec[ i ] - yin[ i ] ) > tol*fabs( yin[ i ] ) ) {
+            astError( AST__INTER,
+                      "Error 7: %d (%.20g,%.20g)->(%.20g,%.20g) (%.20g,%.20g)\n",
+                      i, uout[ i ], vout[ i ], xrec[ i ], yrec[ i ],
+                      xin[ i ], yin[ i ] );
+         }
+      } else if( xrec[ i ] != AST__BAD || yrec[ i ] != AST__BAD ) {
+         astError( AST__INTER,
+                   "Error 8: %d (%.20g,%.20g)->(%.20g,%.20g) (%.20g,%.20g)\n",
+                   i, uout[ i ], vout[ i ], xrec[ i ], yrec[ i ],
+                   xin[ i ], yin[ i ] );
+      }
+   }
+}
+
+int main( void ){
 
    AstSplineMap *sm;
-   int i, status = 0;
    double tx[nx+k], ty[ny+k], cu[nx*ny], cv[nx*ny], uout[npos], vout[npos],
           xrec[npos], yrec[npos], cu2[nx*ny], cv2[nx*ny];
 
@@ -45,25 +122,10 @@ int main(){
       astError( AST__INTER, "Could not open file '2dspline_c.dat'" );
    } else {
 
-      for( i = 0; i < nx+k; i++ ){
-         if( fscanf( in, "%lf", tx + i ) != 1 )
-            astError( AST__INTER, "Failed to read tx[%d]", i );
-      }
-
-      for( i = 0; i < ny+k; i++ ){
-         if( fscanf( in, "%lf", ty + i ) != 1 )
-            astError( AST__INTER, "Failed to read ty[%d]", i );
-      }
-
-      for( i = 0; i < nx*ny; i++ ){
-         if( fscanf( in, "%lf", cu + i ) != 1 )
-            astError( AST__INTER, "Failed to read cu[%d]", i );
-      }
-
-      for( i = 0; i < nx*ny; i++ ){
-         if( fscanf( in, "%lf", cv + i ) != 1 )
-            astError( AST__INTER, "Failed to read cv[%d]", i );
-      }
+      read_values( in, nx + k, tx, "tx" );
+      read_values( in, ny + k, ty, "ty" );
+      read_values( in, nx*ny, cu, "cu" );
+      read_values( in, nx*ny, cv, "cv" );
 
       fclose( in );
    }
@@ -74,61 +136,19 @@ int main(){
 /* Test retrieving the coeffs */
    astSplineCoeffs( sm, 1, nx*ny, cu2 );
    astSplineCoeffs( sm, 2, nx*ny, cv2 );
-   for( i = 0; i < nx*ny; i++ ){
-      if( astOK ) {
-         if( cu2[i] != cu[i] ) {
-            astError( AST__INTER, "Error 100: %d %.20g %.20g", i, cu2[i], cu[i] );
-         } else if( cv2[i] != cv[i] ) {
-            astError( AST__INTER, "Error 101: %d %.20g %.20g", i, cv2[i], cv[i] );
-         }
-      }
-   }
+   if( astOK ) check_coeffs( 100, cu2, cu );
+   if( astOK ) check_coeffs( 101, cv2, cv );
 
 /* Transform a set of points. */
    astTran2( sm, npos, xin, yin, 1, uout, vout );
    if( astOK ) {
-      for( i = 0; i < npos && astOK; i++ ) {
-         if( uexp[i] == AST__BAD ){
-            if(  uout[i] != AST__BAD ) {
-               astError( AST__INTER, "Error 1: %d : %.20g != AST__BAD",
-                         i, uout[i] );
-            }
-         } else if( vexp[i] == AST__BAD ){
-            if( vout[i] != AST__BAD ) {
-               astError( AST__INTER, "Error 2: %d : %.20g != AST__BAD",
-                         i, vout[i] );
-            }
-         } else if( uout[i] == AST__BAD ) {
-             astError( AST__INTER, "Error 3: %d : AST__BAD != %.20g",
-                       i, uexp[i] );
-         } else if( vout[i] == AST__BAD ) {
-             astError( AST__INTER, "Error 4: %d : AST__BAD != %.20g",
-                       i, vexp[i] );
-         } else if( fabs( uout[i]-uexp[i] ) > tol*fabs(uexp[i]) ){
-            astError( AST__INTER, "Error 5: %d : %.20g != %.20g",
-                      i, uout[i], uexp[i] );
-         } else if( fabs( vout[i]-vexp[i] ) > tol*fabs(vexp[i]) ){
-            astError( AST__INTER, "Error 6: %d : %.20g != %.20g",
-                      i, vout[i], vexp[i] );
-         }
-      }
+      check_forward( uexp, vexp, uout, vout );
    }
 
 /* Transform them back again. */
    astTran2( sm, npos, uout, vout, 0, xrec, yrec );
    if( astOK ) {
-      for( i = 0; i < npos && astOK; i++ ){
-         if( uout[i] != AST__BAD && vout[i] != AST__BAD ) {
-            if( fabs( xrec[i]-xin[i] ) > tol*fabs(xin[i]) ||
-                fabs( yrec[i]-yin[i] ) > tol*fabs(yin[i]) ) {
-               astError( AST__INTER, "Error 7: %d (%.20g,%.20g)->(%.20g,%.20g) (%.20g,%.20g)\n",
-                         i,uout[i],vout[i],xrec[i],yrec[i],xin[i],yin[i]);
-            }
-         } else if( xrec[i] != AST__BAD || yrec[i] != AST__BAD ) {
-            astError( AST__INTER, "Error 8: %d (%.20g,%.20g)->(%.20g,%.20g) (%.20g,%.20g)\n",
-                      i,uout[i],vout[i],xrec[i],yrec[i],xin[i],yin[i]);
-         }
-      }
+      check_reverse( xin, yin, uout, vout, xrec, yrec );
    }
 
 
@@ -139,6 +159,3 @@ int main(){
    }
 
 }
-
-
-
