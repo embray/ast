@@ -49,7 +49,8 @@
 /* -----------------------------------------------------------------------
  * Static globals for the tabsource callback (replaces Fortran COMMON block)
  * -----------------------------------------------------------------------*/
-static AstKeyMap *g_tables = NULL;
+static AstFitsTable *g_table = NULL;
+static int *g_test_status = NULL;
 
 /* -----------------------------------------------------------------------
  * stopit: record first error
@@ -68,45 +69,36 @@ static void stopit( int errnum, const char *text, int *status ) {
  * -----------------------------------------------------------------------*/
 static void tabsource( AstFitsChan *fc, const char *extnam, int extver,
                        int extlevel, int *status ) {
-   AstObject *table;
+   *status = 0;
 
    if( strcmp( extnam, "WCS-TAB" ) != 0 ) {
-      stopit( 1035, "tabsource: unexpected extnam", status );
+      stopit( 1035, "tabsource: unexpected extnam", g_test_status );
       return;
    }
 
-   if( !g_tables ) {
-      stopit( 1036, "tabsource: g_tables is NULL", status );
+   if( !g_table ) {
+      stopit( 1036, "tabsource: g_table is NULL", g_test_status );
       return;
    }
 
-   if( !astMapGet0A( g_tables, extnam, &table ) ) {
-      stopit( 1036, "tabsource: key not found", status );
-      return;
-   }
-
-   if( !astIsAFitsTable( table ) ) {
-      stopit( 1037, "tabsource: not a FitsTable", status );
-      astAnnul( table );
+   if( !astIsAFitsTable( g_table ) ) {
+      stopit( 1037, "tabsource: not a FitsTable", g_test_status );
       return;
    }
 
    if( extver != 1 ) {
       printf( "EXTVER=%d\n", extver );
-      stopit( 1065, "tabsource: wrong extver", status );
-      astAnnul( table );
+      stopit( 1065, "tabsource: wrong extver", g_test_status );
       return;
    }
 
    if( extlevel != 1 ) {
-      stopit( 1066, "tabsource: wrong extlevel", status );
-      astAnnul( table );
+      stopit( 1066, "tabsource: wrong extlevel", g_test_status );
       return;
    }
 
-   printf("tabsource called! g_tables size=%d\n", astMapSize(g_tables));
-   astPutTables( fc, g_tables );
-   astAnnul( table );
+   astPutTable( fc, g_table, extnam );
+   if( astOK ) *status = 1;
 }
 
 /* -----------------------------------------------------------------------
@@ -650,14 +642,17 @@ static void checktab( int *status ) {
    if( ncard != astGetI( fc2, "Ncard" ) )
       stopit( 1034, " ", status );
 
-   /* Set g_tables so tabsource callback can use it */
-   g_tables = tables;
+   /* Set g_table so tabsource callback can use it */
+   g_test_status = status;
+   if( !astMapGet0A( tables, "WCS-TAB", (AstObject **) &g_table ) )
+      stopit( 1034, "missing WCS-TAB table for callback", status );
    astTableSource( fc2, tabsource );
    astClear( fc2, "Card" );
    fs2 = (AstFrameSet *)astRead( fc2 );
    if( !fs2 ) stopit( 1035, " ", status );
    if( *status != 0 ) { printf("astRead at 678 failed! status=%d\n", *status); return; }
-   g_tables = NULL;
+   if( g_table ) g_table = astAnnul( g_table );
+   g_test_status = NULL;
 
    if( fs2 ) {
       AstFrame *fr1 = astGetFrame( fs, AST__CURRENT );
