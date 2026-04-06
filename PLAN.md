@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 39 tests passing
+## Current status: 40 tests passing
 
 | Phase | Status |
 |-------|--------|
@@ -24,7 +24,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 remaining batches | Not started |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (39 total)
+### Test inventory (40 total)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -33,7 +33,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (28):**
+**Fortran tests converted to C (30):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
@@ -100,6 +100,9 @@ Key issues:
 
 - **testfitschan.c**: FITS card padding ignored during assertions to match Fortran string comparison rules. Fixed a `heap-use-after-free` bug in `astStore_` (memory.c) exposed by AddressSanitizer during `astConvert`.
 
+- **testregions.c**: Translated automatically and then fixed up to cast `astTranN` input arrays to `(const double *)`.
+- **testrebinseq.c**: Translated to use `astRebinSeq[I|F|D]` depending on the types of the in/out pointers. 
+
 - **testkeymap.c**: C uses 0-based indexing for `astMapKey`, `astMapGetElem*`,
   and `astMapPutElem*` (Fortran uses 1-based). Fortran `elem=0` (append)
   becomes C `elem=-1`. `astMapGet1C` string buffer layout uses `l`-byte
@@ -116,17 +119,16 @@ Key issues:
 
 ## Phase 2 remaining work
 
-### Unconverted Fortran tests (4 of 32)
+### Unconverted Fortran tests (2 of 32)
 - teststc.f (1858 lines) — STC
 
 **Large computational tests:**
-- testregions.f (4076 lines) — Regions
 - testrebin.f (4176 lines) — Rebin
-- testrebinseq.f (1670 lines) — RebinSeq
 
 ### Priority for next work
 
-1. testregions (4076 lines, no callbacks but very large)
+1. testrebin (4176 lines)
+2. teststc (1858 lines)
 2. Channel-callback tests (need reusable in-memory channel helper or
    use SinkFile/SourceFile where possible)
 
@@ -143,4 +145,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 38 tests, all passing.
+Shows 40 tests, all passing.
