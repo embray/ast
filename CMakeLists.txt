@@ -28,6 +28,7 @@ option(AST_WITH_EXTERNAL_CMINPACK "Use external CMINPACK library" OFF)
 option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
 option(AST_ENABLE_WARNINGS "Enable extra compiler warnings for development builds" OFF)
 option(AST_ENABLE_SANITIZERS "Enable address/undefined sanitizers for supported compilers" OFF)
+option(AST_ENABLE_HUGE_TEST "Build the huge manual stress test converted from testhuge.f" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
 

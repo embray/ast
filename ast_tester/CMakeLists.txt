@@ -104,6 +104,10 @@ configure_file(alt.header "${CMAKE_CURRENT_BINARY_DIR}/alt.header" COPYONLY)
 configure_file(sparse.ast "${CMAKE_CURRENT_BINARY_DIR}/sparse.ast" COPYONLY)
 ast_add_test(testfitschan_c SOURCES testfitschan.c)
 
+if(AST_ENABLE_HUGE_TEST)
+    ast_add_test(testhuge_c SOURCES testhuge.c)
+endif()
+
 # --- Conditional tests ---
 if(HAVE_YAML)
     ast_add_test(testyamlchan)

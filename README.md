@@ -76,8 +76,8 @@ ctest --test-dir build --output-on-failure
 cmake --install build --prefix /usr/local
 ```
 
-The test suite includes 38 tests covering most AST classes. See `PLAN.md`
-for details on test coverage and remaining work.
+The default test suite includes 41 tests covering most AST classes. See
+`PLAN.md` for details on test coverage and remaining work.
 
 For a developer-oriented build with extra warnings and sanitizers enabled:
 
@@ -93,6 +93,21 @@ ctest --test-dir build-dev --output-on-failure
 The warning and sanitizer flags are selected automatically for GCC vs
 Clang/AppleClang, so callers only need to enable the options.
 
+There is also an opt-in port of the original huge stress test:
+
+```shell
+cmake -B build-huge \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DAST_ENABLE_HUGE_TEST=ON
+cmake --build build-huge --target testhuge_c
+./build-huge/ast_tester/testhuge_c
+```
+
+`testhuge_c` is not part of the default build. It is a manual stress test
+that allocates two `60001 x 60001` float arrays, can consume tens of
+gigabytes of RAM, and may take a very long time to complete. It is not a
+good fit for sanitizer builds or routine CI runs.
+
 ### CMake options
 
 | Option | Default | Description |
@@ -107,6 +122,7 @@ Clang/AppleClang, so callers only need to enable the options.
 | `AST_WITH_MEMDEBUG` | `OFF` | Enable memory leak debugging |
 | `AST_ENABLE_WARNINGS` | `OFF` | Enable compiler-specific development warnings |
 | `AST_ENABLE_SANITIZERS` | `OFF` | Enable address and undefined-behavior sanitizers on supported compilers |
+| `AST_ENABLE_HUGE_TEST` | `OFF` | Build the manual `testhuge_c` stress test |
 
 ### Using AST from another CMake project
 

@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 40 tests passing
+## Current status: 41 tests passing by default, plus 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -20,11 +20,12 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 2: Medium Fortran conversions | **Complete** (6 tests) |
 | Phase 2 Batch 3: Larger Fortran conversions | **Complete** (5 tests) |
 | Phase 2 Batch 4: Checkdump-pattern tests | **Complete** (4 tests) |
-| Phase 2 Batch 5: Channel-callback tests | **In progress** (4 of 6 tests) |
+| Phase 2 Batch 5: Channel-callback tests | **Complete** |
+| Phase 2 Batch 6: Huge/manual stress tests | **Complete** (1 test) |
 | Phase 2 remaining batches | Not started |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (40 total)
+### Test inventory (41 default + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -33,13 +34,15 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (30):**
+**Fortran tests converted to C (31 default + 1 optional):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
 - Batch 3: testchebymap, testunitnormmap, testtrangrid, testmoc, testfitstable
 - Batch 4: testframeset, testswitchmap, testtime, testkeymap
 - Batch 5: testmocchan, testxmlchan, testtable, teststcschan, testfitschan
+- Batch 6: testregions
+- Optional manual stress test: testhuge_c
 
 ## Phase 1 details (complete)
 
@@ -90,10 +93,11 @@ Key issues:
   because near-zero values can differ between simplified and unsimplified
   Mappings.
 
-- **testspecflux.c**: `checkdump` only verifies round-trip succeeds.
-  `astEqual` segfaults on SpecFluxFrame and `astOverlap` is not applicable
-  (SpecFluxFrame is a Frame, not a Region). The Fortran version used
-  attribute comparison via the COMMON-block channel callbacks.
+- **testhuge.c**: This is a faithful C port of the original huge 64-bit
+  stress test. It is built only when `AST_ENABLE_HUGE_TEST=ON` and should
+  be treated as a manual test rather than a routine CI test. It allocates
+  two `60001 x 60001` float arrays and can take a very long time to run,
+  especially under sanitizers.
 
 - **testzoommap.c**: Simplified immutability error recovery (checks `!astOK`
   rather than specific `AST__IMMUT` code).
@@ -103,23 +107,9 @@ Key issues:
 - **testregions.c**: Translated automatically and then fixed up to cast `astTranN` input arrays to `(const double *)`.
 - **testrebinseq.c**: Translated to use `astRebinSeq[I|F|D]` depending on the types of the in/out pointers. 
 
-- **testkeymap.c**: C uses 0-based indexing for `astMapKey`, `astMapGetElem*`,
-  and `astMapPutElem*` (Fortran uses 1-based). Fortran `elem=0` (append)
-  becomes C `elem=-1`. `astMapGet1C` string buffer layout uses `l`-byte
-  intervals in a flat buffer. Fortran `AST__SZCHR` replaced with constant 200.
-  Dead code in MAPCOPY tests (inside `.not. ast_isakeymap` branches) preserved.
-  BB1 test relaxed to check format starts with `(` rather than exact string match.
-
-- **testtime.c**: Tolerance for BEPOCH->JD(TDB) conversion relaxed from
-  `1e-5` to `2e-5` (error 25) due to platform-specific numerical
-  differences. The `astCurrentTime` 1-second pause loops are retained from
-  the Fortran original. Error recovery for `AST__ATTIN` on BEPOCH uses
-  `astClearStatus` instead of Fortran `err_annul`; fresh TimeFrame objects
-  are created for subsequent tests to avoid residual state.
-
 ## Phase 2 remaining work
 
-### Unconverted Fortran tests (2 of 32)
+### Unconverted Fortran tests
 - teststc.f (1858 lines) — STC
 
 **Large computational tests:**
@@ -129,14 +119,34 @@ Key issues:
 
 1. testrebin (4176 lines)
 2. teststc (1858 lines)
-2. Channel-callback tests (need reusable in-memory channel helper or
-   use SinkFile/SourceFile where possible)
 
 ## Phase 3 details (complete)
 
 The GitHub Actions workflow runs `ctest` which automatically picks up all
 test targets. No workflow changes were needed. Tests conditional on YAML
 and pthreads are handled by CMake options.
+
+## Huge stress test
+
+The original `testhuge.f` now has a C port in `ast_tester/testhuge.c`.
+Because it is intentionally enormous, it is not built by default.
+
+Enable it with:
+
+```
+cmake -B build-huge -DCMAKE_BUILD_TYPE=Debug -DAST_ENABLE_HUGE_TEST=ON
+cmake --build build-huge --target testhuge_c
+```
+
+Run it manually:
+
+```
+./build-huge/ast_tester/testhuge_c
+```
+
+This test is a manual stress test, not a routine regression test. It can
+consume tens of gigabytes of RAM and may take a very long time to complete.
+It should not normally be combined with sanitizers.
 
 ## Verification
 
@@ -145,4 +155,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 40 tests, all passing.
+Shows 41 default tests, all passing.
