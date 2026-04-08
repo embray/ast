@@ -2366,7 +2366,7 @@ astMAKE_ISA(Ellipse,Region)
 astMAKE_CHECK(Ellipse)
 
 AstEllipse *astEllipse_( void *frame_void, int form, const double centre[2],
-                         const double point1[2], const double *point2,
+                         const double point1[2], const double point2[2],
                          AstRegion *unc, const char *options, int *status, ...) {
 /*
 *++
@@ -2555,7 +2555,7 @@ f     function is invoked with STATUS set to an error value, or if it
 }
 
 AstEllipse *astEllipseId_( void *frame_void, int form, const double centre[2],
-                         const double point1[2], const double *point2,
+                         const double point1[2], const double point2[2],
                          void *unc_void, const char *options, ... ) {
 /*
 *  Name:
@@ -2651,7 +2651,7 @@ AstEllipse *astEllipseId_( void *frame_void, int form, const double centre[2],
 AstEllipse *astInitEllipse_( void *mem, size_t size, int init, AstEllipseVtab *vtab,
                              const char *name, AstFrame *frame, int form,
                              const double centre[2], const double point1[2],
-                             const double *point2, AstRegion *unc, int *status ){
+                             const double point2[2], AstRegion *unc, int *status ){
 /*
 *+
 *  Name:
@@ -3025,7 +3025,6 @@ void astEllipsePars_( AstEllipse *this, double centre[2], double *a,
    (**astMEMBER(this,Ellipse,EllipsePars))( this, centre, a, b,
                                             angle, p1, p2, status );
 }
-
 
 
 
