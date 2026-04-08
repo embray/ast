@@ -71,7 +71,7 @@ The CMake build does not require any Starlink infrastructure.
 
 ```shell
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 cmake --install build --prefix /usr/local
 ```
@@ -89,6 +89,49 @@ cmake -B build-dev \
 cmake --build build-dev
 ctest --test-dir build-dev --output-on-failure
 ```
+
+To limit or increase parallelism explicitly, use:
+
+```shell
+cmake --build build --parallel 8
+```
+
+This is the CMake equivalent of `make -j8`.
+
+### Build types and compiler flags
+
+The standard single-config CMake build types are:
+
+- `Release` - optimized build for normal use
+- `Debug` - unoptimized build with debug information
+- `RelWithDebInfo` - optimized build with debug information
+- `MinSizeRel` - optimized for smaller binaries
+
+Choose one with `-DCMAKE_BUILD_TYPE=...`, for example:
+
+```shell
+cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug
+cmake -B build-relwithdebinfo -DCMAKE_BUILD_TYPE=RelWithDebInfo
+```
+
+If you need to add or override compiler flags, the usual CMake forms are:
+
+```shell
+cmake -B build-debug \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS_DEBUG="-O0 -g"
+```
+
+or for all build types:
+
+```shell
+cmake -B build-custom \
+  -DCMAKE_C_FLAGS="-O0"
+```
+
+Setting `CFLAGS` in the environment before the first `cmake` configure step
+also works, but using `-DCMAKE_C_FLAGS...` makes the chosen flags explicit in
+the build configuration.
 
 The warning and sanitizer flags are selected automatically for GCC vs
 Clang/AppleClang, so callers only need to enable the options.
