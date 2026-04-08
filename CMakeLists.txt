@@ -28,6 +28,7 @@ option(AST_WITH_EXTERNAL_CMINPACK "Use external CMINPACK library" OFF)
 option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
 option(AST_ENABLE_WARNINGS "Enable extra compiler warnings for development builds" OFF)
 option(AST_ENABLE_SANITIZERS "Enable address/undefined sanitizers for supported compilers" OFF)
+option(AST_ENABLE_COVERAGE "Enable compiler coverage instrumentation for supported compilers" OFF)
 option(AST_ENABLE_HUGE_TEST "Build the huge manual stress test converted from testhuge.f" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
@@ -38,6 +39,8 @@ option(BUILD_TESTING "Build the test program" ON)
 set(AST_WARNING_FLAGS)
 set(AST_SANITIZER_COMPILE_FLAGS)
 set(AST_SANITIZER_LINK_FLAGS)
+set(AST_COVERAGE_COMPILE_FLAGS)
+set(AST_COVERAGE_LINK_FLAGS)
 
 if(AST_ENABLE_WARNINGS)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
@@ -81,6 +84,36 @@ if(AST_ENABLE_SANITIZERS)
     endif()
 endif()
 
+if(AST_ENABLE_COVERAGE AND AST_ENABLE_SANITIZERS)
+    message(FATAL_ERROR "AST_ENABLE_COVERAGE and AST_ENABLE_SANITIZERS cannot be enabled together")
+endif()
+
+if(AST_ENABLE_COVERAGE)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        list(APPEND AST_COVERAGE_COMPILE_FLAGS
+            -O0
+            -g
+            --coverage
+        )
+        list(APPEND AST_COVERAGE_LINK_FLAGS
+            --coverage
+        )
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        list(APPEND AST_COVERAGE_COMPILE_FLAGS
+            -O0
+            -g
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+        list(APPEND AST_COVERAGE_LINK_FLAGS
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+    else()
+        message(WARNING "AST_ENABLE_COVERAGE is ON, but no coverage profile is defined for compiler ${CMAKE_C_COMPILER_ID}")
+    endif()
+endif()
+
 function(ast_apply_dev_options target_name)
     if(AST_WARNING_FLAGS)
         target_compile_options(${target_name} PRIVATE ${AST_WARNING_FLAGS})
@@ -90,6 +123,12 @@ function(ast_apply_dev_options target_name)
     endif()
     if(AST_SANITIZER_LINK_FLAGS)
         target_link_options(${target_name} PRIVATE ${AST_SANITIZER_LINK_FLAGS})
+    endif()
+    if(AST_COVERAGE_COMPILE_FLAGS)
+        target_compile_options(${target_name} PRIVATE ${AST_COVERAGE_COMPILE_FLAGS})
+    endif()
+    if(AST_COVERAGE_LINK_FLAGS)
+        target_link_options(${target_name} PRIVATE ${AST_COVERAGE_LINK_FLAGS})
     endif()
 endfunction()
 
@@ -785,6 +824,56 @@ if(BUILD_TESTING)
     ast_apply_dev_options(ast_test)
     add_test(NAME ast_test COMMAND ast_test)
     add_subdirectory(ast_tester)
+
+    if(AST_ENABLE_COVERAGE)
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            find_program(LCOV_EXECUTABLE lcov)
+            find_program(GENHTML_EXECUTABLE genhtml)
+            if(LCOV_EXECUTABLE)
+                set(AST_COVERAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/coverage")
+                set(AST_COVERAGE_FULL_INFO "${AST_COVERAGE_DIR}/coverage.full.info")
+                set(AST_COVERAGE_INFO "${AST_COVERAGE_DIR}/lcov.info")
+                add_custom_target(coverage-report
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${AST_COVERAGE_DIR}"
+                    COMMAND ${LCOV_EXECUTABLE} --directory "${CMAKE_BINARY_DIR}" --zerocounters
+                    COMMAND ${CMAKE_CTEST_COMMAND} --test-dir "${CMAKE_BINARY_DIR}" --output-on-failure
+                    COMMAND ${LCOV_EXECUTABLE}
+                        --capture
+                        --directory "${CMAKE_BINARY_DIR}"
+                        --output-file "${AST_COVERAGE_FULL_INFO}"
+                        --rc branch_coverage=1
+                    COMMAND ${LCOV_EXECUTABLE}
+                        --extract "${AST_COVERAGE_FULL_INFO}" "${CMAKE_SOURCE_DIR}/src/*"
+                        --output-file "${AST_COVERAGE_INFO}"
+                        --ignore-errors unused
+                        --rc branch_coverage=1
+                    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                    COMMENT "Running tests and generating LCOV report in ${AST_COVERAGE_DIR}"
+                    USES_TERMINAL
+                )
+                if(GENHTML_EXECUTABLE)
+                    add_custom_target(coverage-html
+                        COMMAND ${CMAKE_COMMAND} -E make_directory "${AST_COVERAGE_DIR}/html"
+                        COMMAND ${GENHTML_EXECUTABLE}
+                            --branch-coverage
+                            --legend
+                            --output-directory "${AST_COVERAGE_DIR}/html"
+                            "${AST_COVERAGE_INFO}"
+                        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                        COMMENT "Generating HTML coverage report in ${AST_COVERAGE_DIR}/html"
+                        USES_TERMINAL
+                    )
+                    add_dependencies(coverage-html coverage-report)
+                else()
+                    message(STATUS "AST_ENABLE_COVERAGE is ON but genhtml was not found; coverage-html target will not be available")
+                endif()
+            else()
+                message(STATUS "AST_ENABLE_COVERAGE is ON but lcov was not found; coverage-report target will not be available")
+            endif()
+        elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+            message(STATUS "AST_ENABLE_COVERAGE is ON for Clang; instrumentation is enabled, but the coverage-report target is currently only generated for GNU + lcov")
+        endif()
+    endif()
 endif()
 
 # ============================================================

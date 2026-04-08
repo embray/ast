@@ -93,6 +93,27 @@ ctest --test-dir build-dev --output-on-failure
 The warning and sanitizer flags are selected automatically for GCC vs
 Clang/AppleClang, so callers only need to enable the options.
 
+For a coverage-instrumented build:
+
+```shell
+cmake -B build-coverage \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DAST_ENABLE_COVERAGE=ON
+cmake --build build-coverage --parallel
+cmake --build build-coverage --target coverage-report
+cmake --build build-coverage --target coverage-html
+```
+
+With GCC and `lcov` installed, `coverage-report` runs `ctest`, captures
+coverage data, and writes an LCOV report to `build-coverage/coverage/lcov.info`.
+If `genhtml` is also installed, `coverage-html` generates an HTML report in
+`build-coverage/coverage/html`.
+
+With Clang/AppleClang, `AST_ENABLE_COVERAGE=ON` still enables compiler
+instrumentation automatically, but the packaged `coverage-report` target is
+currently only generated for GCC + `lcov`.
+
 There is also an opt-in port of the original huge stress test:
 
 ```shell
@@ -122,6 +143,7 @@ good fit for sanitizer builds or routine CI runs.
 | `AST_WITH_MEMDEBUG` | `OFF` | Enable memory leak debugging |
 | `AST_ENABLE_WARNINGS` | `OFF` | Enable compiler-specific development warnings |
 | `AST_ENABLE_SANITIZERS` | `OFF` | Enable address and undefined-behavior sanitizers on supported compilers |
+| `AST_ENABLE_COVERAGE` | `OFF` | Enable coverage instrumentation for supported compilers |
 | `AST_ENABLE_HUGE_TEST` | `OFF` | Build the manual `testhuge_c` stress test |
 
 ### Using AST from another CMake project
