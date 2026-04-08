@@ -163,6 +163,9 @@ f     The StcsChan class does not define any new routines beyond those
 *        description.
 *     26-MAR-2015 (DSB):
 *        Guard against seg faults if an error has already occured.
+*     8-APR-2026 (TIMJ):
+*        Preserve formatted ERROR values when writing time, spectral and
+*        redshift uncertainties.
 *class--
 */
 
@@ -8760,7 +8763,6 @@ AstStcsChan *astLoadStcsChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
 
 
 

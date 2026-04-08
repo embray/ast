@@ -1279,6 +1279,9 @@ f     - AST_WRITEFITS: Write all cards out to the sink function
 *        determine if a PolyMap conforming to the requirements of the SIP
 *        paper can be created from the supplied FrameSet by various
 *        rearrangement of the pixel->sky Mapping in the FrameSet.
+*     8-APR-2026 (TIMJ):
+*        Use larger bounded buffers in a few internal formatting paths and
+*        guard Match against zero returned fields when reversing them.
 *class--
 */
 
@@ -22584,7 +22587,7 @@ static int Match( const char *test, const char *temp, int maxfld, int *fields,
    in the same order that they occur in the template. */
    if( !match_nentry ){
       nfret = ( *nfld < maxfld ) ? (*nfld) : maxfld;
-      if( nfret > 0 ) {
+      if( nfret > 1 ) {
          match_pa = fields;
          match_pb = fields + nfret - 1;
          for( i = 0; i < nfret/2; i++ ){
@@ -45191,8 +45194,6 @@ static void ListFC( AstFitsChan *this, const char *ttl ) {
    this->card = cardo;
 }
 */
-
-
 
 
 

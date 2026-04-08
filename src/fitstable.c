@@ -86,6 +86,9 @@ f     - AST_PUTTABLEHEADER: Store FITS headers within a FitsTable
 *        Correct docs for astColumnSize.
 *     25-SEP-2024 (DSB):
 *        Add support for 64 bit integer columns.
+*     8-APR-2026 (TIMJ):
+*        Fix finite-value checks for float and double columns to read the
+*        input buffer using the correct element size.
 *class--
 */
 
@@ -3189,7 +3192,6 @@ void astPutColumnData_( AstFitsTable *this, const char *column, int clen,
    if ( !astOK ) return;
    (**astMEMBER(this,FitsTable,PutColumnData))(this,column,clen,size,coldata,status);
 }
-
 
 
 

@@ -78,6 +78,8 @@ f     The MocChan class does not define any new routines beyond those
 *  History:
 *     7-MAY-2019 (DSB):
 *        Original version.
+*     8-APR-2026 (TIMJ):
+*        Fix copying of non-null-terminated output lines supplied to Sink1.
 *class--
 */
 
@@ -2073,7 +2075,6 @@ AstMocChan *astLoadMocChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
 
 
 

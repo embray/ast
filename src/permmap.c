@@ -93,6 +93,9 @@ f     The PermMap class does not define any new routines beyond those
 *        transformation of the PermMap. The FitsCHan class needs to be able
 *        to change it to determine when checking if the -TAB algorithm can
 *        be used.
+*     8-APR-2026 (TIMJ):
+*        Fix astEqual to compare the effective permutation arrays safely when
+*        PermMaps are inverted.
 *class--
 */
 
@@ -3195,5 +3198,4 @@ int *astGetOutPerm_( AstPermMap *this, int *status ){
    if( !astOK ) return NULL;
    return (**astMEMBER(this,PermMap,GetOutPerm))( this, status );
 }
-
 
