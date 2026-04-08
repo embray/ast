@@ -12,8 +12,10 @@
  *  - err_flush/msg_out/err_rep are replaced by printf().
  *
  *  - The Fortran checktab() subroutine used a COMMON block (/tabsrc/) to
- *    share the "tables" KeyMap with the tabsource() callback.  In C this is
- *    replaced by a static global variable g_tables.
+ *    share state with the tabsource() callback.  In C this is replaced by
+ *    static globals holding the callback FitsTable and the test status
+ *    pointer. The callback's final argument is treated as the required
+ *    success flag for astTableSource, not as the inherited AST status.
  *
  *  - The Fortran readobj() helper used a Fortran CHANNEL with a file-based
  *    chsource() callback.  The C version uses fopen/fgets directly with a
@@ -35,7 +37,8 @@
  *  - The sip.head test was referenced via SourceFile attribute in Fortran;
  *    we do the same in C.
  *
- *  - The Fortran COMMON /tabsrc/ is replaced by a static global g_tables.
+ *  - The callback now supplies the required WCS-TAB extension using
+ *    astPutTable(), matching the current C astTableSource contract.
  */
 
 #include "ast.h"
