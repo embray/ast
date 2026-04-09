@@ -33,16 +33,23 @@ set(TEST_LIBS
 
 # Helper function to add a test executable
 function(ast_add_test name)
-    cmake_parse_arguments(T "INTERNAL_HEADERS" "" "SOURCES;EXTRA_LIBS" ${ARGN})
+    cmake_parse_arguments(T "INTERNAL_HEADERS;NO_DEFAULT_GRF_LIBS" "" "SOURCES;EXTRA_LIBS;TEST_ARGS" ${ARGN})
     if(NOT T_SOURCES)
         set(T_SOURCES ${name}.c)
     endif()
     add_executable(${name} ${T_SOURCES})
     target_include_directories(${name} PRIVATE ${TEST_INCLUDES})
-    target_link_libraries(${name} PRIVATE ${TEST_LIBS} ${T_EXTRA_LIBS})
+    
+    if(T_NO_DEFAULT_GRF_LIBS)
+        set(TARGET_LIBS ast $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_err> m ${T_EXTRA_LIBS})
+    else()
+        set(TARGET_LIBS ${TEST_LIBS} ${T_EXTRA_LIBS})
+    endif()
+    
+    target_link_libraries(${name} PRIVATE ${TARGET_LIBS})
     target_compile_definitions(${name} PRIVATE HAVE_CONFIG_H)
     ast_apply_dev_options(${name})
-    add_test(NAME ${name} COMMAND ${name}
+    add_test(NAME ${name} COMMAND ${name} ${T_TEST_ARGS}
              WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 endfunction()
 
@@ -116,4 +123,15 @@ endif()
 
 if(HAVE_PTHREADS)
     ast_add_test(testthreads EXTRA_LIBS Threads::Threads)
+endif()
+
+if(PLPLOT_FOUND)
+    configure_file(lsst.fits-wcs "${CMAKE_CURRENT_BINARY_DIR}/lsst.fits-wcs" COPYONLY)
+    ast_add_test(testplotter
+        NO_DEFAULT_GRF_LIBS
+        EXTRA_LIBS $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf_plplot> ${PLPLOT_LIBRARIES}
+        TEST_ARGS "lsst.fits-wcs" " " " " "testplotter.ps"
+    )
+    target_include_directories(testplotter PRIVATE ${PLPLOT_INCLUDE_DIRS})
+    target_link_directories(testplotter PRIVATE ${PLPLOT_LIBRARY_DIRS})
 endif()

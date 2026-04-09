@@ -779,6 +779,23 @@ add_dependencies(ast_err ast_err_h)
 ast_apply_dev_options(ast_err)
 
 # ============================================================
+# PLplot graphics library
+# ============================================================
+find_package(PkgConfig QUIET)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PLPLOT QUIET plplot)
+endif()
+
+if(PLPLOT_FOUND)
+    add_library(ast_grf_plplot STATIC src/grf_plplot.c)
+    target_include_directories(ast_grf_plplot PRIVATE ${SATELLITE_INCLUDES} ${PLPLOT_INCLUDE_DIRS})
+    target_compile_definitions(ast_grf_plplot PRIVATE HAVE_CONFIG_H)
+    set_target_properties(ast_grf_plplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    add_dependencies(ast_grf_plplot ast_err_h)
+    ast_apply_dev_options(ast_grf_plplot)
+endif()
+
+# ============================================================
 # Null graphics libraries
 # ============================================================
 add_library(ast_grf_2.0 STATIC src/grf_2.0.c)
@@ -885,6 +902,15 @@ install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
+
+if(PLPLOT_FOUND)
+    install(TARGETS ast_grf_plplot
+        EXPORT astTargets
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+endif()
 
 set(AST_INSTALL_HEADERS
     "${CMAKE_CURRENT_BINARY_DIR}/ast.h"

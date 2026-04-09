@@ -41,7 +41,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - Batch 3: testchebymap, testunitnormmap, testtrangrid, testmoc, testfitstable
 - Batch 4: testframeset, testswitchmap, testtime, testkeymap
 - Batch 5: testmocchan, testxmlchan, testtable, teststcschan, testfitschan
-- Batch 6: testregions
+- Batch 6: testregions, testplotter (conditional on PLplot)
 - Optional manual stress test: testhuge_c
 
 ## Phase 1 details (complete)
