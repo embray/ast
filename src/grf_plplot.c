@@ -52,6 +52,45 @@
 /* ========== */
 #define R2D 57.29578             /* Radians to degrees factor */
 
+/* Globals */
+/* ======= */
+static PLINT current_color = 1;
+
+/* Helper function to replace ASCII hyphen with Unicode minus sign for better typography */
+static char *format_text(const char *in_text) {
+    if (!in_text) return NULL;
+    int hyphen_count = 0;
+    const char *p = in_text;
+    while (*p) {
+        if (*p == '-') hyphen_count++;
+        p++;
+    }
+    if (hyphen_count == 0) {
+        char *out = astMalloc(strlen(in_text) + 1);
+        if (out) strcpy(out, in_text);
+        return out;
+    }
+
+    /* Each '-' (1 byte) becomes '\xE2\x88\x92' (3 bytes), so we need 2 extra bytes per hyphen */
+    char *out = astMalloc(strlen(in_text) + hyphen_count * 2 + 1);
+    if (!out) return NULL;
+
+    char *q = out;
+    p = in_text;
+    while (*p) {
+        if (*p == '-') {
+            *q++ = '\xE2';
+            *q++ = '\x88';
+            *q++ = '\x92';
+        } else {
+            *q++ = *p;
+        }
+        p++;
+    }
+    *q = '\0';
+    return out;
+}
+
 /* Externally visible functions. */
 /* ============================= */
 
@@ -118,17 +157,27 @@ int astGMark( int n, const float *x, const float *y, int type ){
 
 int astGScales( float *alpha, float *beta ){
    PLFLT wx1, wx2, wy1, wy2;
-   PLFLT nx1, nx2, ny1, ny2;
+   PLFLT dx1, dx2, dy1, dy2;
+   PLFLT sx1, sx2, sy1, sy2;
+   PLFLT vx1, vx2, vy1, vy2;
 
    /* Get viewport in world coordinates */
    c_plgvpw( &wx1, &wx2, &wy1, &wy2 );
    /* Get subpage bounds in physical coordinates (mm) */
-   c_plgspa( &nx1, &nx2, &ny1, &ny2 );
+   c_plgspa( &sx1, &sx2, &sy1, &sy2 );
+   /* Get viewport bounds in normalized device coordinates (0 to 1 across subpage) */
+   c_plgvpd( &dx1, &dx2, &dy1, &dy2 );
+
+   /* Calculate viewport bounds in mm */
+   vx1 = sx1 + dx1 * (sx2 - sx1);
+   vx2 = sx1 + dx2 * (sx2 - sx1);
+   vy1 = sy1 + dy1 * (sy2 - sy1);
+   vy2 = sy1 + dy2 * (sy2 - sy1);
 
    if( wx2 != wx1 && wy2 != wy1 &&
-       nx2 != nx1 && ny2 != ny1 ) {
-      *alpha = (float) ((nx2 - nx1) / (wx2 - wx1));
-      *beta  = (float) ((ny2 - ny1) / (wy2 - wy1));
+       vx2 != vx1 && vy2 != vy1 ) {
+      *alpha = (float) ((vx2 - vx1) / (wx2 - wx1));
+      *beta  = (float) ((vy2 - vy1) / (wy2 - wy1));
       return 1;
    } else {
       astError( AST__GRFER, "astGScales: The graphics window or viewport has zero size." );
@@ -140,7 +189,7 @@ int astGText( const char *text, float x, float y, const char *just,
               float upx, float upy ){
    char lj[ 2 ];
    float alpha, beta;
-   PLFLT fjust, dx, dy, dx_mm, dy_mm, pl_upx, pl_upy;
+   PLFLT fjust, dx, dy, dx_mm, dy_mm;
 
    if( text && text[ 0 ] != 0 ){
       if( just ){
@@ -175,47 +224,64 @@ int astGText( const char *text, float x, float y, const char *just,
       dx = dx_mm / alpha;
       dy = dy_mm / beta;
 
+      /* Draw opaque background box to erase underlying lines */
+      float xb[4], yb[4];
+      if (astGTxExt(text, x, y, just, upx, upy, xb, yb)) {
+         PLFLT px[4], py[4];
+         int k;
+         for(k=0; k<4; k++) {
+            px[k] = (PLFLT) xb[k];
+            py[k] = (PLFLT) yb[k];
+         }
+         c_plcol0(0); /* Background color */
+         c_plfill(4, px, py);
+         c_plcol0(current_color); /* Restore foreground color */
+      }
+
       /* Adjust vertical reference point - PLplot natively uses center vertical justification (half capital height) */
       if( lj[0] != 'C' ){
          PLFLT def_chr, chr_ht;
          c_plgchr( &def_chr, &chr_ht ); /* chr_ht is in mm */
 
-         /* Normalize up vector */
-         float uplen = sqrt(upx*upx + upy*upy);
+         /* UP vector in mm system */
+         float ux = alpha * upx;
+         float uy = beta * upy;
+         float uplen = sqrt(ux*ux + uy*uy);
          if( uplen > 0.0 ){
-            pl_upx = upx / uplen;
-            pl_upy = upy / uplen;
+            ux /= uplen;
+            uy /= uplen;
          } else {
             astError( AST__GRFER, "astGText: Zero length up-vector supplied.");
             return 0;
          }
 
-         /* Convert chr_ht to world coords height offset roughly */
-         PLFLT hu = chr_ht / sqrt(alpha*alpha*pl_upx*pl_upx + beta*beta*pl_upy*pl_upy);
-
+         float shift_mm = 0.0f;
          if( lj[ 0 ] == 'T' ){
-            /* User wants reference at top. plptex draws at center. Shift down by 0.5 * hu */
-            x -= 0.5 * pl_upx * hu;
-            y -= 0.5 * pl_upy * hu;
+            /* Shift down by 0.5 * chr_ht */
+            shift_mm = -0.5f * chr_ht;
          } else if( lj[ 0 ] == 'B' ){
-            /* User wants reference at baseline. plptex draws at center. Shift up by 0.5 * hu */
-            x += 0.5 * pl_upx * hu;
-            y += 0.5 * pl_upy * hu;
+            /* Shift up by 0.5 * chr_ht */
+            shift_mm = 0.5f * chr_ht;
          }
-      }
 
-      c_plptex( (PLFLT) x, (PLFLT) y, dx, dy, fjust, text );
+         /* Apply shift in world coords */
+         x += (shift_mm * ux) / alpha;
+         y += (shift_mm * uy) / beta;
+      }
+      char *fmt_text = format_text(text);
+      if (fmt_text) {
+         c_plptex( (PLFLT) x, (PLFLT) y, dx, dy, fjust, fmt_text );
+         astFree(fmt_text);
+      }
    }
    return 1;
 }
-
 int astGTxExt( const char *text, float x, float y, const char *just,
                float upx, float upy, float *xb, float *yb ){
    char lj[ 2 ];
    int i;
    float alpha, beta;
-   float uplen, ux, uy, vx, vy, uxu, uyu, uxd, uyd;
-   float hu, hd, vdx, vdy, udx, udy, xc, yc;
+   float ux, uy, vx, vy, uplen;
    PLFLT def_chr, chr_ht;
 
    for( i = 0; i < 4; i++ ){
@@ -249,69 +315,61 @@ int astGTxExt( const char *text, float x, float y, const char *just,
          return 0;
       }
 
-      /* Baseline vector in mm */
+      /* Baseline unit vector in mm system */
       vx = uy;
       vy = -ux;
 
       c_plgchr( &def_chr, &chr_ht );
-      /* Approximation for text depth and height in mm */
-      hu = chr_ht;
-      hd = -0.2 * chr_ht; /* approximate descent */
 
-      uxu = ux * hu;
-      uyu = uy * hu;
-      uxd = ux * hd;
-      uyd = uy * hd;
-
-      /* Width in mm */
+      /* Physical dimensions in mm.
+         PLplot's chr_ht is a reference height. We define the top at 1.0*ht
+         and descent at -0.2*ht to match PGPLOT standard conventions. */
+      float phys_hu = 1.0f * chr_ht;
+      float phys_hd = -0.2f * chr_ht;
       extern PLFLT plstrl( const char * );
-      float width_mm = (float)plstrl(text);
+      char *fmt_text = format_text(text);
+      float phys_w = 0.0f;
+      if (fmt_text) {
+         phys_w = (float)plstrl(fmt_text);
+         astFree(fmt_text);
+      }
 
-      vx *= width_mm;
-      vy *= width_mm;
+      /* PGPLOT adds 0.2 * hu to the width, and the padding is fully asymmetric
+         (e.g. for Left justified, the box starts exactly at x and extends right). */
+      float padded_w = phys_w + 0.2f * phys_hu;
 
-      /* Convert back to world coordinates */
-      vx /= alpha;
-      vy /= beta;
-
-      uxu /= alpha;
-      uyu /= beta;
-      uxd /= alpha;
-      uyd /= beta;
-
-      xc = x;
-      yc = y;
+      /* Physical center offset in mm system from reference point */
+      float cx_mm = 0.0f;
+      float cy_mm = 0.0f;
 
       if( lj[0] == 'B' ) {
-         /* (x,y) is the baseline.
-            The center of the bounding box is halfway between 'hd' and 'hu'.
-            So its distance from the baseline is 0.5 * (hu + hd). */
-         xc += 0.5 * (uxu + uxd);
-         yc += 0.5 * (uyu + uyd);
+         cy_mm = 0.5f * (phys_hu + phys_hd);
       } else if( lj[0] == 'T' ) {
-         /* (x,y) is the top.
-            The center of the bounding box is at -0.5 * (hu - hd) from top. */
-         xc -= 0.5 * (uxu - uxd);
-         yc -= 0.5 * (uyu - uyd);
+         cy_mm = -0.5f * (phys_hu - phys_hd);
       } else if( lj[0] == 'C' ) {
-         /* (x,y) is the center (0.5 * hu above the baseline).
-            The center of the bounding box is at 0.5 * hd from this. */
-         xc += 0.5 * uxd;
-         yc += 0.5 * uyd;
+         cy_mm = 0.5f * phys_hd;
       }
 
       if( lj[1] == 'L' ) {
-         xc += 0.5 * vx;
-         yc += 0.5 * vy;
+         cx_mm = 0.5f * padded_w;
       } else if( lj[1] == 'R' ) {
-         xc -= 0.5 * vx;
-         yc -= 0.5 * vy;
+         cx_mm = -0.5f * padded_w;
       }
 
-      vdx = 0.5 * vx;
-      vdy = 0.5 * vy;
-      udx = 0.5 * (uxu - uxd);
-      udy = 0.5 * (uyu - uyd);
+      /* Convert center offset to world coordinates and apply to reference point */
+      float xc = x + (cx_mm * vx + cy_mm * ux) / alpha;
+      float yc = y + (cx_mm * vy + cy_mm * uy) / beta;
+
+      /* Bounding box half-dimensions in mm */
+      float half_w_mm = 0.5f * padded_w;
+      float half_h_mm = 0.5f * (phys_hu - phys_hd);
+
+      /* Half-width and half-height vectors in world coordinates */
+      float vdx = (half_w_mm * vx) / alpha;
+      float vdy = (half_w_mm * vy) / beta;
+
+      float udx = (half_h_mm * ux) / alpha;
+      float udy = (half_h_mm * uy) / beta;
 
       xb[ 0 ] = xc - vdx - udx;
       yb[ 0 ] = yc - vdy - udy;
@@ -327,34 +385,24 @@ int astGTxExt( const char *text, float x, float y, const char *just,
    }
    return 1;
 }
-
 int astGQch( float *chv, float *chh ){
    PLFLT def_chr, chr_ht;
-   PLFLT wx1, wx2, wy1, wy2;
-   PLFLT nx1, nx2, ny1, ny2;
+   float alpha, beta;
 
    /* Get character height in mm */
    c_plgchr( &def_chr, &chr_ht );
 
-   /* Get viewport and subpage to calculate mm to world scale */
-   c_plgvpw( &wx1, &wx2, &wy1, &wy2 );
-   c_plgspa( &nx1, &nx2, &ny1, &ny2 );
-
-   if( nx1 != nx2 ){
-      *chv = (float) (chr_ht * (wx2 - wx1) / (nx2 - nx1));
+   /* Use the scales to convert from mm to world coordinates */
+   if( astGScales( &alpha, &beta ) ) {
+      /* Scales are (mm per world unit) -> world unit = mm / scale */
+      /* Prevent division by zero mathematically, astGScales already checks this but safety first */
+      *chv = (alpha != 0.0f) ? (float)(chr_ht / fabs((double)alpha)) : 0.0f;
+      *chh = (beta != 0.0f) ? (float)(chr_ht / fabs((double)beta)) : 0.0f;
+      return 1;
    } else {
-      astError( AST__GRFER, "astGQch: The graphics viewport has zero size in X.");
+      astError( AST__GRFER, "astGQch: Failed to get graphics scales.");
       return 0;
    }
-
-   if( ny1 != ny2 ){
-      *chh = (float) (chr_ht * (wy2 - wy1) / (ny2 - ny1));
-   } else {
-      astError( AST__GRFER, "astGQch: The graphics viewport has zero size in Y.");
-      return 0;
-   }
-
-   return 1;
 }
 
 int astGAttr( int attr, double value, double *old_value, int prim ){
@@ -395,6 +443,7 @@ int astGAttr( int attr, double value, double *old_value, int prim ){
          ival = (PLINT) ( value + 0.5 );
          if( ival < 0 ) ival = 1;
          c_plcol0( ival );
+         current_color = ival;
       }
 
    } else {

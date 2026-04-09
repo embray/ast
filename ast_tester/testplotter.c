@@ -115,6 +115,9 @@ int main(int argc, char **argv) {
         } else if (ext && strcmp(ext, ".pdf") == 0) {
             c_plsdev("pdfcairo");
             c_plsfnam(psfile);
+        } else if (ext && strcmp(ext, ".svg") == 0) {
+            c_plsdev("svgcairo");
+            c_plsfnam(psfile);
         } else if (ext && strcmp(ext, ".png") == 0) {
             c_plsdev("pngcairo");
             c_plsfnam(psfile);
