@@ -73,6 +73,7 @@ f     The XmlChan class does not define any new routines beyond those
 
 *  Authors:
 *     DSB: David Berry (Starlink)
+*     TIMJ: Tim Jenness (Rubin Observatory)
 
 *  History:
 *     10-OCT-2003 (DSB):
@@ -91,14 +92,15 @@ f     The XmlChan class does not define any new routines beyond those
 *        In AstroCoordAreaReader, correct the way the TimeOrigin value
 *        is transferred from the main TimeFrame to the uncertainty region.
 *        This bug only manifested itself as a result of running the STC
-*        tester on a 32 bit machine, where the loss of prcision caused
+*        tester on a 32 bit machine, where the loss of prceision caused
 *        by the bug caused a test to fail.
-*     8-APR-2026 (TJ):
+*     8-APR-2026 (TIMJ):
 *        In AstroCoordsReader, change the lo and hi variables from
 *        scalar doubles to 2-element arrays. They are passed to
 *        astInterval which indexes lbnd[i] for i=0..naxes-1, causing
 *        a stack buffer overflow when the positional frame has more
 *        than one axis (e.g. a SkyFrame).
+*        Fix astFree of static buffer in xmlchan.c Report function.
 *class--
 
 * Further STC work:
@@ -9015,7 +9017,6 @@ static void Report( AstXmlChan *this, AstXmlElement *elem, int severity,
       text = (char *) astXmlGetTag( elem, 1 );
       astError( AST__BADIN, "astRead(%s): Failed to read %s element: %s", status,
                 astGetClass( this ), text, msg );
-      text = astFree( text );
    }
 }
 
@@ -14404,16 +14405,3 @@ AstXmlChan *astLoadXmlChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
-
-
-
-
-
-
-
-
-
-
-
-
