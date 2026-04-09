@@ -59,6 +59,9 @@
 *  History:
 *     7-SEP-2004 (DSB):
 *        Original version.
+*     9-APR-2026 (TIMJ):
+*        Change astEllipse_ prototype from const double[2] to
+*        const double* to silence GCC -Wstringop-overread.
 *-
 */
 
@@ -157,7 +160,7 @@ astPROTO_ISA(Ellipse)            /* Test class membership */
 
 /* Constructor. */
 #if defined(astCLASS)            /* Protected. */
-AstEllipse *astEllipse_( void *, int, const double[2], const double[2], const double[2], AstRegion *, const char *, int *, ...);
+AstEllipse *astEllipse_( void *, int, const double *, const double *, const double *, AstRegion *, const char *, int *, ...);
 #else
 AstEllipse *astEllipseId_( void *, int, const double[2], const double[2], const double[2], AstRegion *, const char *, ... )__attribute__((format(printf,7,8)));
 #endif
