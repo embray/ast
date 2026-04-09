@@ -93,6 +93,12 @@ f     The XmlChan class does not define any new routines beyond those
 *        This bug only manifested itself as a result of running the STC
 *        tester on a 32 bit machine, where the loss of prcision caused
 *        by the bug caused a test to fail.
+*     8-APR-2026 (TJ):
+*        In AstroCoordsReader, change the lo and hi variables from
+*        scalar doubles to 2-element arrays. They are passed to
+*        astInterval which indexes lbnd[i] for i=0..naxes-1, causing
+*        a stack buffer overflow when the positional frame has more
+*        than one axis (e.g. a SkyFrame).
 *class--
 
 * Further STC work:
@@ -1330,8 +1336,8 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
    const char *names[4];         /* Names of the subelements to be searched for */
    char buff[100];               /* Message buffer */
    double epoch;                 /* Epoch */
-   double hi;                    /* High limit for zero-width interval */
-   double lo;                    /* Low limit for zero-width interval */
+   double hi[2];                 /* High limits for zero-width interval */
+   double lo[2];                 /* Low limits for zero-width interval */
    double pos[2];                /* Reference spatial position */
    double rf;                    /* Rest frequency */
    int axes[2];                  /* Indices of position axes */
@@ -1606,8 +1612,10 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
          }
 
 /* Do each of the other items, all of which are described by a Region. */
-         lo = 0.0;
-         hi = 0.0;
+         lo[0] = 0.0;
+         lo[1] = 0.0;
+         hi[0] = 0.0;
+         hi[1] = 0.0;
          for( i = 0; i < 5; i++ ) {
 
 /* Initialise a flag indicating that we have not yet found any non-null
@@ -1627,7 +1635,7 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
                   t = (AstRegion *) o;
                   use = 1;
                } else {
-                  t = (AstRegion *) astInterval( pfrm, &lo, &hi, NULL, "", status );
+                  t = (AstRegion *) astInterval( pfrm, lo, hi, NULL, "", status );
                }
             }
 
@@ -1639,7 +1647,7 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
                   r = (AstRegion *) o;
                   use = 1;
                } else {
-                  r = (AstRegion *) astInterval( tfrm, &lo, &hi, NULL, "", status );
+                  r = (AstRegion *) astInterval( tfrm, lo, hi, NULL, "", status );
                }
 
 /* If there were earlier axes, extrude the current total region into the
@@ -1663,7 +1671,7 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
                   r = (AstRegion *) o;
                   use = 1;
                } else {
-                  r = (AstRegion *) astInterval( sfrm, &lo, &hi, NULL, "", status );
+                  r = (AstRegion *) astInterval( sfrm, lo, hi, NULL, "", status );
                }
 
                if( t ) {
@@ -1683,7 +1691,7 @@ static int AstroCoordsReader( AstXmlChan *this, AstXmlElement *elem,
                   r = (AstRegion *) o;
                   use = 1;
                } else {
-                  r = (AstRegion *) astInterval( rfrm, &lo, &hi, NULL, "", status );
+                  r = (AstRegion *) astInterval( rfrm, lo, hi, NULL, "", status );
                }
 
                if( t ) {
