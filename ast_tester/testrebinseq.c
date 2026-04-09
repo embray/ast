@@ -162,7 +162,7 @@ static void addnoise( int n, double *array, double sigma, int *status ) {
    snprintf( fwd, sizeof( fwd ), "Y=Gauss(0.0,%.17g)", sigma );
    fwd_ptr[ 0 ] = fwd;
 
-   mm = (AstMapping *) astMathMap( 1, 1, 1, fwd_ptr, 1, inv_ptr, "" );
+   mm = (AstMapping *) astMathMap( 1, 1, 1, fwd_ptr, 1, inv_ptr, " " );
    if( !astOK || !mm ) return;
 
    nused = BUFSIZE;
@@ -206,7 +206,7 @@ static void test1( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, NX, NY, NX, NY );
    flags = AST__REBININIT + AST__REBINEND;
 
-   map = (AstMapping *) astUnitMap( ndim, "" );
+   map = (AstMapping *) astUnitMap( ndim, " " );
    astRebinSeqF( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread, params,
                  flags, 0.01, 50, badval, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, out, weights, &nused );
@@ -257,7 +257,7 @@ static void test2( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, NX, NY, NX, NY );
    flags = AST__REBININIT;
 
-   map = (AstMapping *) astUnitMap( ndim, "" );
+   map = (AstMapping *) astUnitMap( ndim, " " );
    for( i = 1; i <= 3; i++ ) {
       if( i == 3 ) flags = AST__REBINEND;
       astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread,
@@ -311,7 +311,7 @@ static void test3( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, NX, NY, NX, NY );
    flags = AST__REBININIT + AST__NONORM;
 
-   map = (AstMapping *) astUnitMap( ndim, "" );
+   map = (AstMapping *) astUnitMap( ndim, " " );
    for( i = 1; i <= 3; i++ ) {
       astRebinSeqI( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread,
                     params, flags, 0.01, 50, INT_MIN, ndim, lbnd_out,
@@ -388,7 +388,7 @@ static void test4( int ndim, int spread, const double *params, int *status ) {
    outb[ 1 ] = 0.25*lbnd_out[ 1 ] + 0.75*ubnd_out[ 1 ];
    outb[ 2 ] = inb[ 2 ];
 
-   map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, "" );
+   map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, " " );
    astRebinSeqF( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread, params,
                  flags, 0.01, 1000, badval, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, out, weights, &nused );
@@ -531,7 +531,7 @@ static void test5( int ndim, int spread, const double *params, int *status ) {
       outb[ 1 ] = va*lbnd_in[ 1 ] + vb*ubnd_in[ 1 ];
       outb[ 2 ] = inb[ 2 ];
 
-      map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, "" );
+      map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, " " );
       astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread,
                     params, flags, 0.01, 50, AST__BAD, ndim, lbnd_out,
                     ubnd_out, lbnd_in, ubnd_in, out, out, weights, &nused );
@@ -663,7 +663,7 @@ static void test6( int ndim, int spread, const double *params, int *status ) {
       outb[ 1 ] = va*lbnd_in[ 1 ] + vb*ubnd_in[ 1 ];
       outb[ 2 ] = inb[ 2 ];
 
-      map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, "" );
+      map = (AstMapping *) astWinMap( ndim, ina, inb, outa, outb, " " );
       astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread,
                     params, flags, 0.01, 50, AST__BAD, ndim, lbnd_out,
                     ubnd_out, lbnd_in, ubnd_in, out, out, weights, &nused );
@@ -754,7 +754,7 @@ static void test7( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, NX, NY, NX, NY );
    flags = AST__REBININIT + AST__REBINEND;
 
-   map = (AstMapping *) astZoomMap( ndim, 0.5, "" );
+   map = (AstMapping *) astZoomMap( ndim, 0.5, " " );
    astRebinSeqF( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread, params,
                  flags, 0.01, 50, badval, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, out, weights, &nused );
@@ -810,14 +810,14 @@ static void test8( int ndim, int spread, const double *params, int *status ) {
 
    if( ndim < 3 ) {
       map = (AstMapping *) astCmpMap(
-         (AstMapping *) astZoomMap( ndim, 0.5, "" ),
-         (AstMapping *) astShiftMap( ndim, shifts, "" ), 1, "" );
+         (AstMapping *) astZoomMap( ndim, 0.5, " " ),
+         (AstMapping *) astShiftMap( ndim, shifts, " " ), 1, " " );
    } else {
       map = (AstMapping *) astCmpMap(
          (AstMapping *) astCmpMap(
-            (AstMapping *) astZoomMap( 2, 0.5, "" ),
-            (AstMapping *) astShiftMap( 2, shifts, "" ), 1, "" ),
-         (AstMapping *) astUnitMap( 1, "" ), 0, "" );
+            (AstMapping *) astZoomMap( 2, 0.5, " " ),
+            (AstMapping *) astShiftMap( 2, shifts, " " ), 1, " " ),
+         (AstMapping *) astUnitMap( 1, " " ), 0, " " );
    }
 
    astRebinSeqF( map, 0.0, ndim, lbnd_in, ubnd_in, in, in, spread, params,
@@ -898,7 +898,7 @@ static void test9( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, nx, ny, nx, ny );
    flags = AST__REBININIT + AST__REBINEND + AST__NONORM + AST__USEVAR;
 
-   map = (AstMapping *) astZoomMap( ndim, 0.5, "" );
+   map = (AstMapping *) astZoomMap( ndim, 0.5, " " );
    astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, vin, spread, params,
                  flags, 0.01, 50, AST__BAD, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, vout, weights, &nused );
@@ -998,7 +998,7 @@ static void test10( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, nx, ny, nx, ny );
    flags = AST__REBININIT + AST__REBINEND + AST__CONSERVEFLUX + AST__USEVAR;
 
-   map = (AstMapping *) astZoomMap( ndim, 0.5, "" );
+   map = (AstMapping *) astZoomMap( ndim, 0.5, " " );
    astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, vin, spread, params,
                  flags, 0.01, 50, AST__BAD, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, vout, weights, &nused );
@@ -1098,7 +1098,7 @@ static void test11( int ndim, int spread, const double *params, int *status ) {
    set_bounds( lbnd_in, ubnd_in, lbnd_out, ubnd_out, nx, ny, nx, ny );
    flags = AST__REBININIT + AST__REBINEND + AST__GENVAR;
 
-   map = (AstMapping *) astZoomMap( ndim, 0.5, "" );
+   map = (AstMapping *) astZoomMap( ndim, 0.5, " " );
    astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, vin, spread, params,
                  flags, 0.01, 50, AST__BAD, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, vout, weights, &nused );
@@ -1199,7 +1199,7 @@ static void test12( int ndim, int spread, const double *params, int *status ) {
    flags = AST__REBININIT + AST__REBINEND + AST__GENVAR +
            AST__CONSERVEFLUX + AST__VARWGT;
 
-   map = (AstMapping *) astZoomMap( ndim, 0.5, "" );
+   map = (AstMapping *) astZoomMap( ndim, 0.5, " " );
    astRebinSeqD( map, 0.0, ndim, lbnd_in, ubnd_in, in, vin, spread, params,
                  flags, 0.01, 50, AST__BAD, ndim, lbnd_out, ubnd_out,
                  lbnd_in, ubnd_in, out, vout, weights, &nused );
