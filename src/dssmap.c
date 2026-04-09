@@ -95,6 +95,9 @@ f     The DssMap class does not define any new routines beyond those
 *        Override astGetObjSize.
 *     10-MAY-2006 (DSB):
 *        Override astEqual.
+*     8-APR-2026 (TIMJ):
+*        Convert K&R-style function declarations to ANSI prototypes
+*        for platepos and platepix.
 *class--
 */
 

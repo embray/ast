@@ -189,6 +189,9 @@ f     The CmpFrame class does not define any new routines beyond those
 *        Increase size of "buf2" buffer in SetAttrib, and trap buffer overflow.
 *     11-JAN-2017 (GSB):
 *        Override astSetDtai, astGetDtai and astClearDtai.
+*     8-APR-2026 (TIMJ):
+*        Use snprintf instead of sprintf in SetAttrib to prevent
+*        buffer overruns.
 *class--
 */
 

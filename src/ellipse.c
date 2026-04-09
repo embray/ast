@@ -65,6 +65,8 @@ f     - AST_ELLIPSEPARS: Get the geometric parameters of the Ellipse
 *     6-JAN-2014 (DSB):
 *        Ensure cached information is available in RegCentre even if no new
 *        centre is supplied.
+*     8-APR-2026 (TIMJ):
+*        Fix variable-length array parameter in astEllipseId_ prototype.
 *class--
 */
 

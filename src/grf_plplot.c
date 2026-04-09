@@ -8,7 +8,11 @@
 *  Description:
 *     This file implements the low level graphics functions required
 *     by the rest of AST, by calling suitable PLPlot functions.
-*
+
+*  History:
+*     8-APR-2026 (TIMJ):
+*        Original version.
+
 *  Licence:
 *     This program is free software: you can redistribute it and/or
 *     modify it under the terms of the GNU Lesser General Public

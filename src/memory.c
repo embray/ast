@@ -171,6 +171,10 @@
 *        threads occur sequentially rather than overlapping. Without
 *        this, the flagging of memory blocks as "permanent" is spurious (this
 *        only affects anything if AST is configured --with-memdebug).
+*     8-APR-2026 (TIMJ):
+*        Fix heap-use-after-free in astStore by copying data before
+*        freeing the old block. Increase stemp buffer size in
+*        astAppendStringf.
 */
 
 /* Configuration results. */

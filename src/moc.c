@@ -163,6 +163,8 @@ f     - AST_TESTCELL: Test if a single HEALPix cell is included in a Moc
 *     13-JUN-2025 (DSB):
 *        - Fix memory leak in RegBaseMesh.
 *        - Remove unused variable from RegBaseMesh.
+*     8-APR-2026 (TIMJ):
+*        Guard against null pointer in error message formatting.
 *class--
 */
 

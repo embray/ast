@@ -216,6 +216,8 @@ f     - AST_MAPTYPE: Return the data type of a named entry in a map
 *     27-MAY-2021 (DSB):
 *         Modify astMapGet1<X> so that nval=0 is returned if the value is
 *         undefined.
+*     8-APR-2026 (TIMJ):
+*        Increase buffer size in DumpEntry to prevent overrun.
 *class--
 */
 
