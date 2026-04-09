@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     psfile = argv[4];
 
     /* Note: In plotter.f it uses argument 3 (attr2) for FitsChan */
-    fc = astFitsChan(NULL, NULL, attr2);
+    fc = astFitsChan(NULL, NULL, "%s", attr2);
 
     fp = fopen(file, "r");
     if (!fp) {
@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
         }
 
         pl = astPlot(fs, gbox, pbox, "title=A FITS test");
-        astSet(pl, attr1);
+        astSet(pl, "%s", attr1);
 
         astGrid(pl);
 

@@ -114,7 +114,7 @@ static AstObject *readobj( const char *file, int *status ) {
    if( *status != 0 ) return NULL;
 
    snprintf(opts, sizeof(opts), "SourceFile=%s", file);
-   ch = astChannel( NULL, NULL, opts );
+   ch = astChannel( NULL, NULL, "%s", opts );
    obj = astRead( ch );
    astAnnul( ch );
    if( !obj ) *status = 1;
