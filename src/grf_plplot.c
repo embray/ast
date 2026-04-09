@@ -164,23 +164,22 @@ int astGText( const char *text, float x, float y, const char *just,
          fjust = 0.5;
       }
 
-      /* Let's define the baseline vector dx, dy. The up vector is upx, upy. 
+      /* Let's define the baseline vector dx, dy. The up vector is upx, upy.
          Baseline vector is perpendicular to the up vector.
          If up vector in mm is (upx*alpha, upy*beta), then baseline vector in mm is
          (upy*beta, -upx*alpha). So in world coordinates: (upy*beta/alpha, -upx). */
       dx_mm = upy * beta;
       dy_mm = -upx * alpha;
-      
+
       /* In world coords */
       dx = dx_mm / alpha;
       dy = dy_mm / beta;
 
-      /* Adjust vertical reference point - PLplot natively uses baseline justification for y */
-      /* Approximation for 'T' and 'C' justification */
-      if( lj[0] != 'B' ){
+      /* Adjust vertical reference point - PLplot natively uses center vertical justification (half capital height) */
+      if( lj[0] != 'C' ){
          PLFLT def_chr, chr_ht;
          c_plgchr( &def_chr, &chr_ht ); /* chr_ht is in mm */
-         
+
          /* Normalize up vector */
          float uplen = sqrt(upx*upx + upy*upy);
          if( uplen > 0.0 ){
@@ -190,16 +189,18 @@ int astGText( const char *text, float x, float y, const char *just,
             astError( AST__GRFER, "astGText: Zero length up-vector supplied.");
             return 0;
          }
-         
+
          /* Convert chr_ht to world coords height offset roughly */
          PLFLT hu = chr_ht / sqrt(alpha*alpha*pl_upx*pl_upx + beta*beta*pl_upy*pl_upy);
-         
+
          if( lj[ 0 ] == 'T' ){
-            x -= pl_upx * hu;
-            y -= pl_upy * hu;
-         } else if( lj[ 0 ] == 'C' ){
+            /* User wants reference at top. plptex draws at center. Shift down by 0.5 * hu */
             x -= 0.5 * pl_upx * hu;
             y -= 0.5 * pl_upy * hu;
+         } else if( lj[ 0 ] == 'B' ){
+            /* User wants reference at baseline. plptex draws at center. Shift up by 0.5 * hu */
+            x += 0.5 * pl_upx * hu;
+            y += 0.5 * pl_upy * hu;
          }
       }
 
@@ -252,7 +253,7 @@ int astGTxExt( const char *text, float x, float y, const char *just,
       vx = uy;
       vy = -ux;
 
-      c_plgchr( &def_chr, &chr_ht ); 
+      c_plgchr( &def_chr, &chr_ht );
       /* Approximation for text depth and height in mm */
       hu = chr_ht;
       hd = -0.2 * chr_ht; /* approximate descent */
@@ -263,8 +264,9 @@ int astGTxExt( const char *text, float x, float y, const char *just,
       uyd = uy * hd;
 
       /* Width in mm */
-      float width_mm = strlen(text) * chr_ht * 0.6f; 
-      
+      extern PLFLT plstrl( const char * );
+      float width_mm = (float)plstrl(text);
+
       vx *= width_mm;
       vy *= width_mm;
 
@@ -281,11 +283,21 @@ int astGTxExt( const char *text, float x, float y, const char *just,
       yc = y;
 
       if( lj[0] == 'B' ) {
-         xc += 0.5 * uxu;
-         yc += 0.5 * uyu;
+         /* (x,y) is the baseline.
+            The center of the bounding box is halfway between 'hd' and 'hu'.
+            So its distance from the baseline is 0.5 * (hu + hd). */
+         xc += 0.5 * (uxu + uxd);
+         yc += 0.5 * (uyu + uyd);
       } else if( lj[0] == 'T' ) {
-         xc -= 0.5 * uxu;
-         yc -= 0.5 * uyu;
+         /* (x,y) is the top.
+            The center of the bounding box is at -0.5 * (hu - hd) from top. */
+         xc -= 0.5 * (uxu - uxd);
+         yc -= 0.5 * (uyu - uyd);
+      } else if( lj[0] == 'C' ) {
+         /* (x,y) is the center (0.5 * hu above the baseline).
+            The center of the bounding box is at 0.5 * hd from this. */
+         xc += 0.5 * uxd;
+         yc += 0.5 * uyd;
       }
 
       if( lj[1] == 'L' ) {
@@ -298,14 +310,14 @@ int astGTxExt( const char *text, float x, float y, const char *just,
 
       vdx = 0.5 * vx;
       vdy = 0.5 * vy;
-      udx = 0.5 * uxu;
-      udy = 0.5 * uyu;
+      udx = 0.5 * (uxu - uxd);
+      udy = 0.5 * (uyu - uyd);
 
-      xb[ 0 ] = xc - vdx - udx + uxd;
-      yb[ 0 ] = yc - vdy - udy + uyd;
+      xb[ 0 ] = xc - vdx - udx;
+      yb[ 0 ] = yc - vdy - udy;
 
-      xb[ 1 ] = xc + vdx - udx + uxd;
-      yb[ 1 ] = yc + vdy - udy + uyd;
+      xb[ 1 ] = xc + vdx - udx;
+      yb[ 1 ] = yc + vdy - udy;
 
       xb[ 2 ] = xc + vdx + udx;
       yb[ 2 ] = yc + vdy + udy;
