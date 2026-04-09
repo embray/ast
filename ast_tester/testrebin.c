@@ -884,6 +884,14 @@ static void test2( int phase, DataType dtype,
                           to_double( dtype, in, in_idx ), type_name( dtype ) );
                   return;
                }
+               if( !equal_gen( dtype, (const char *)out_var + k * type_size(dtype),
+                               (const char *)in_var + in_idx * type_size(dtype) ) ) {
+                  *status = 1;
+                  printf( "TEST2 %d: variance %g != %g (type %s)\n",
+                          k1, to_double( dtype, out_var, k ),
+                          to_double( dtype, in_var, in_idx ), type_name( dtype ) );
+                  return;
+               }
             }
             k++;
          }
@@ -968,6 +976,14 @@ static void test3( int phase, DataType dtype,
                      printf( "TEST3 %d: data %g != %g (type %s)\n",
                              k1, to_double( dtype, out, k ),
                              to_double( dtype, in, in_idx ), type_name( dtype ) );
+                     return;
+                  }
+                  if( !equal_gen( dtype, (const char *)out_var + k * type_size(dtype),
+                                  (const char *)in_var + in_idx * type_size(dtype) ) ) {
+                     *status = 1;
+                     printf( "TEST3 %d: variance %g != %g (type %s)\n",
+                             k1, to_double( dtype, out_var, k ),
+                             to_double( dtype, in_var, in_idx ), type_name( dtype ) );
                      return;
                   }
                }
@@ -1126,6 +1142,14 @@ static void test5( int phase, DataType dtype,
                           to_double( dtype, in, in_idx ), type_name( dtype ) );
                   return;
                }
+               if( !equal_gen( dtype, (const char *)out_var + k * type_size(dtype),
+                               (const char *)in_var + in_idx * type_size(dtype) ) ) {
+                  *status = 1;
+                  printf( "TEST5 %d: variance %g != %g (type %s)\n",
+                          k1, to_double( dtype, out_var, k ),
+                          to_double( dtype, in_var, in_idx ), type_name( dtype ) );
+                  return;
+               }
             }
             k++;
          }
@@ -1209,6 +1233,14 @@ static void test6( int phase, DataType dtype,
                      printf( "TEST6 %d: data %g != %g (type %s)\n",
                              k1, to_double( dtype, out, k ),
                              to_double( dtype, in, in_idx ), type_name( dtype ) );
+                     return;
+                  }
+                  if( !equal_gen( dtype, (const char *)out_var + k * type_size(dtype),
+                                  (const char *)in_var + in_idx * type_size(dtype) ) ) {
+                     *status = 1;
+                     printf( "TEST6 %d: variance %g != %g (type %s)\n",
+                             k1, to_double( dtype, out_var, k ),
+                             to_double( dtype, in_var, in_idx ), type_name( dtype ) );
                      return;
                   }
                }

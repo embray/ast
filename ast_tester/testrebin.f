@@ -2243,10 +2243,10 @@
                      CALL ERR_REP( ' ', 'TEST2D ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALD( OUT( K ), IN( K-3 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALD(OUT_VAR(K),IN_VAR(K-3))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADD ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADD ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -2355,10 +2355,10 @@
                      CALL ERR_REP( ' ', 'TEST2I ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALI( OUT( K ), IN( K-3 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALI(OUT_VAR(K),IN_VAR(K-3))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADI ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADI ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -2467,10 +2467,10 @@
                      CALL ERR_REP( ' ', 'TEST2R ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALR( OUT( K ), IN( K-3 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALR(OUT_VAR(K),IN_VAR(K-3))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADR ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADR ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -2656,10 +2656,11 @@
                         CALL ERR_REP( ' ', 'TEST3D ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALD( OUT( K ), IN(K+13) ) ) THEN
+                     ELSE IF(.NOT. EQUALD(OUT_VAR(K),IN_VAR(K+13)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADD ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADD ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
@@ -2789,10 +2790,11 @@
                         CALL ERR_REP( ' ', 'TEST3I ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALI( OUT( K ), IN(K+13) ) ) THEN
+                     ELSE IF(.NOT. EQUALI(OUT_VAR(K),IN_VAR(K+13)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADI ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADI ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
@@ -2922,10 +2924,11 @@
                         CALL ERR_REP( ' ', 'TEST3R ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALR( OUT( K ), IN(K+13) ) ) THEN
+                     ELSE IF(.NOT. EQUALR(OUT_VAR(K),IN_VAR(K+13)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADR ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADR ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
@@ -3447,10 +3450,10 @@
                      CALL ERR_REP( ' ', 'TEST5D ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALD( OUT( K ), IN( K-2 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALD(OUT_VAR(K),IN_VAR(K-2))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADD ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADD ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -3569,10 +3572,10 @@
                      CALL ERR_REP( ' ', 'TEST5I ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALI( OUT( K ), IN( K-2 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALI(OUT_VAR(K),IN_VAR(K-2))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADI ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADI ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -3691,10 +3694,10 @@
                      CALL ERR_REP( ' ', 'TEST5R ^I: data ^V != ^B',
      :                             STATUS )
                      RETURN
-                  ELSE IF( .NOT. EQUALR( OUT( K ), IN( K-2 ) ) ) THEN
+                  ELSE IF(.NOT. EQUALR(OUT_VAR(K),IN_VAR(K-2))) THEN
                      STATUS = SAI__ERROR
                      CALL MSG_SETI( 'I', K )
-                     IF( OUT( K ) .NE. VAL__BADR ) THEN
+                     IF( OUT_VAR( K ) .NE. VAL__BADR ) THEN
                         CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                      ELSE
                         CALL MSG_SETC( 'V', 'BAD' )
@@ -3881,10 +3884,11 @@
                         CALL ERR_REP( ' ', 'TEST6D ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALD( OUT( K ), IN(K-2) ) ) THEN
+                     ELSE IF(.NOT. EQUALD(OUT_VAR(K),IN_VAR(K-2)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADD ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADD ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
@@ -4015,10 +4019,11 @@
                         CALL ERR_REP( ' ', 'TEST6I ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALI( OUT( K ), IN(K-2) ) ) THEN
+                     ELSE IF(.NOT. EQUALI(OUT_VAR(K),IN_VAR(K-2)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADI ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADI ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
@@ -4149,10 +4154,11 @@
                         CALL ERR_REP( ' ', 'TEST6R ^I: data ^V != ^B',
      :                                STATUS )
                         RETURN
-                     ELSE IF( .NOT. EQUALR( OUT( K ), IN(K-2) ) ) THEN
+                     ELSE IF(.NOT. EQUALR(OUT_VAR(K),IN_VAR(K-2)))
+     :               THEN
                         STATUS = SAI__ERROR
                         CALL MSG_SETI( 'I', K )
-                        IF( OUT( K ) .NE. VAL__BADR ) THEN
+                        IF( OUT_VAR( K ) .NE. VAL__BADR ) THEN
                            CALL MSG_SETD( 'V', DBLE( OUT_VAR( K ) ) )
                         ELSE
                            CALL MSG_SETC( 'V', 'BAD' )
