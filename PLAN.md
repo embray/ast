@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 43 tests passing by default, plus 1 optional huge stress test
+## Current status: 44 tests passing by default, plus 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -25,7 +25,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 7: Final large tests | **Complete** (2 tests) |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (43 default + 1 optional)
+### Test inventory (44 default + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -34,14 +34,14 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (31 default + 1 optional):**
+**Fortran tests converted to C (33 default + 1 optional):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
 - Batch 3: testchebymap, testunitnormmap, testtrangrid, testmoc, testfitstable
 - Batch 4: testframeset, testswitchmap, testtime, testkeymap
 - Batch 5: testmocchan, testxmlchan, testtable, teststcschan, testfitschan
-- Batch 6: testregions, testplotter (conditional on PLplot)
+- Batch 6: testregions, testrebinseq, testplotter (conditional on PLplot)
 - Batch 7: testrebin, teststc
 - Optional manual stress test: testhuge_c
 
@@ -157,4 +157,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 43 default tests, all passing.
+Shows 44 default tests, all passing.
