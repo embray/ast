@@ -100,6 +100,8 @@ for current status and priorities.
 
 ## Important notes
 
+- When making fixes to the files in src/ ensure that the history in the prologue
+  is updated with the change.
 - Keep `PLAN.md` updated as work progresses on test conversions
 - `astEqual` segfaults on some classes (e.g. SpecFluxFrame) — avoid using it
   without testing first
