@@ -793,6 +793,25 @@ if(PLPLOT_FOUND)
     set_target_properties(ast_grf_plplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_dependencies(ast_grf_plplot ast_err_h)
     ast_apply_dev_options(ast_grf_plplot)
+
+    # plstrl() computes string width in mm but is a private PLplot symbol.
+    # The header (plplotP.h) may be installed even when the symbol is not
+    # exported from the shared library, so check that we can actually link
+    # against it.
+    include(CheckSymbolExists)
+    set(CMAKE_REQUIRED_INCLUDES ${PLPLOT_INCLUDE_DIRS})
+    set(CMAKE_REQUIRED_LIBRARIES ${PLPLOT_LIBRARIES})
+    list(JOIN PLPLOT_LIBRARY_DIRS ";" _plplot_libdirs)
+    if(_plplot_libdirs)
+        set(CMAKE_REQUIRED_LINK_DIRECTORIES ${_plplot_libdirs})
+    endif()
+    check_symbol_exists(plstrl "plplotP.h" HAVE_PLSTRL)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_LINK_DIRECTORIES)
+    if(HAVE_PLSTRL)
+        target_compile_definitions(ast_grf_plplot PRIVATE HAVE_PLSTRL)
+    endif()
 endif()
 
 # ============================================================

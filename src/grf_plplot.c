@@ -51,6 +51,9 @@
 #include <math.h>
 #include <string.h>
 #include <plplot.h>              /* PLPlot native C API */
+#ifdef HAVE_PLSTRL
+#include <plplotP.h>             /* Private API for plstrl */
+#endif
 
 /* Constants. */
 /* ========== */
@@ -330,11 +333,18 @@ int astGTxExt( const char *text, float x, float y, const char *just,
          and descent at -0.2*ht to match PGPLOT standard conventions. */
       float phys_hu = 1.0f * chr_ht;
       float phys_hd = -0.2f * chr_ht;
-      extern PLFLT plstrl( const char * );
+
+      /* Compute string width in mm. Use PLplot's plstrl() if the
+         private header is available, otherwise estimate from character
+         count (Hershey font width is roughly 0.6 * height). */
       char *fmt_text = format_text(text);
       float phys_w = 0.0f;
       if (fmt_text) {
+#ifdef HAVE_PLSTRL
          phys_w = (float)plstrl(fmt_text);
+#else
+         phys_w = (float)(strlen(fmt_text) * chr_ht * 0.6);
+#endif
          astFree(fmt_text);
       }
 
