@@ -51,6 +51,12 @@ function(ast_add_test name)
     ast_apply_dev_options(${name})
     add_test(NAME ${name} COMMAND ${name} ${T_TEST_ARGS}
              WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    # AST's memory system intentionally caches freed blocks for reuse,
+    # so LeakSanitizer reports false positives. Disable leak detection.
+    if(AST_ENABLE_SANITIZERS)
+        set_tests_properties(${name} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    endif()
 endfunction()
 
 # --- Tests using public API only ---
