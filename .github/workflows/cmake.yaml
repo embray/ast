@@ -15,16 +15,30 @@ jobs:
         build_type: [Release]
         shared_libs: [ON, OFF]
         fortran: [OFF]
+        sanitizers: [OFF]
         include:
           # Add a Fortran build on each platform (shared only)
           - os: ubuntu-latest
             build_type: Release
             shared_libs: ON
             fortran: ON
+            sanitizers: OFF
           - os: macos-latest
             build_type: Release
             shared_libs: ON
             fortran: ON
+            sanitizers: OFF
+          # Debug builds with sanitizers
+          - os: ubuntu-latest
+            build_type: Debug
+            shared_libs: ON
+            fortran: OFF
+            sanitizers: ON
+          - os: macos-latest
+            build_type: Debug
+            shared_libs: ON
+            fortran: OFF
+            sanitizers: ON
 
     runs-on: ${{ matrix.os }}
 
@@ -47,6 +61,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DBUILD_SHARED_LIBS=${{ matrix.shared_libs }}
           -DAST_BUILD_FORTRAN=${{ matrix.fortran }}
+          -DAST_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
 
       - name: Build
         run: cmake --build build --parallel
