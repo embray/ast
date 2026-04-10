@@ -37,8 +37,9 @@ int main(int argc, char **argv) {
     double pbox[4];
     float gbox[4];
     float range, delta, asp;
+    PLFLT dx1, dx2, dy1, dy2;
     int naxis1 = 100, naxis2 = 100;
-    
+
     astWatch(&status);
 
     if (argc < 5) {
@@ -125,19 +126,21 @@ int main(int argc, char **argv) {
             c_plsdev("psc");
             c_plsfnam(psfile);
         }
-        
+
         /* Initialize PLplot */
         c_plinit();
 
-        /* In plotter.f, PGWNAD and PGQWIN were used to define the viewport/window
-           Here we set standard normalized viewport and then set the window 
-           to 0..1 in both directions. */
+        /* Let PLplot establish its normal equal-scale plotting viewport, but
+           use the actual viewport bounds as the graphics area available to
+           AST. If we instead hand AST the full 0..1 world window, it places
+           exterior labels into the part of the world that PLplot clips away. */
         c_plenv(0.0, 1.0, 0.0, 1.0, 1, -2);
-        
-        gbox[0] = 0.0;
-        gbox[2] = 1.0;
-        gbox[1] = 0.0;
-        gbox[3] = 1.0;
+        c_plgvpd(&dx1, &dx2, &dy1, &dy2);
+
+        gbox[0] = (float) dx1;
+        gbox[2] = (float) dx2;
+        gbox[1] = (float) dy1;
+        gbox[3] = (float) dy2;
 
         range = gbox[2] - gbox[0];
         gbox[0] = gbox[0] + 0.05f * range;
