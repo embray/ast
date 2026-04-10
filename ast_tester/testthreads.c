@@ -13,7 +13,8 @@ typedef struct MyData {
 
 int main( void ){
    pthread_t thread1, thread2;
-   MyData data1, data2;
+   static MyData data1, data2;  /* static to avoid ASan stack-use-after-return
+                                   false positive when threads access these */
    int status = SAI__OK;
 
    errMark();
