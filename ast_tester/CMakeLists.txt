@@ -62,9 +62,9 @@ endfunction()
 # --- Tests using public API only ---
 ast_add_test(testerror)
 ast_add_test(testobject)
+ast_add_test(testconvert)
 
 # --- Tests using internal headers (#define astCLASS) ---
-ast_add_test(testconvert INTERNAL_HEADERS)
 ast_add_test(testresimp INTERNAL_HEADERS)
 
 # --- Tests needing SAE_PAR stub ---
