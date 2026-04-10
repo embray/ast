@@ -132,6 +132,7 @@ int main( void ) {
    };
 
    astWatch( status );
+   astBegin;
 
    /* UnitMap */
    m = (AstMapping *)astUnitMap( 2, " " );
@@ -191,6 +192,8 @@ int main( void ) {
    astClear( fc, "Card" );
    fs = (AstFrameSet *)astRead( fc );
    testmap( (AstMapping *)fs, 8, 0.0001, status );
+
+   astEnd;
 
    if( *status == 0 ) {
       printf( " All astTranGrid tests passed\n" );

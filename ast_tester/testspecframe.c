@@ -39,6 +39,7 @@ int main( void ) {
    AstFrameSet *fs;
 
    astWatch( status );
+   astBegin;
 
    sf = astSpecFrame( "system=freq,unit=Hz" );
    if( astGetD( sf, "SpecOrigin" ) != 0.0 ) stopit( status, "Error 0" );
@@ -102,6 +103,8 @@ int main( void ) {
    astSetC( sf, "SourceSys", "VREL" );
    if( fabs( astGetD( sf, "SourceVel" ) - 1000.0 ) > 1.0e-6 )
       stopit( status, "Error 12" );
+
+   astEnd;
 
    if( *status == 0 ) {
       printf( " All SpecFrame tests passed\n" );

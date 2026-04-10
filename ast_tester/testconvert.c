@@ -10,18 +10,28 @@
 #include "unitmap.h"
 #include "permmap.h"
 
+/* astBegin/astEnd macros are not defined when astCLASS is set, so call
+   the underlying functions directly. */
+void astBegin_( void );
+void astEnd_( int * );
+
 int main( void ){
    int status_value = 0;
    int *status = &status_value;
 
    AstFrameSet *fs;
-
-   AstSkyFrame *sf = astSkyFrame( " ", status );
-   AstSpecFrame *df = astSpecFrame( " ", status );
-   AstCmpFrame *cf = astCmpFrame( df, sf, " ", status );
-   AstFrame *bf = astFrame( 2, "Domain=SKY", status );
+   AstSkyFrame *sf;
+   AstSpecFrame *df;
+   AstCmpFrame *cf;
+   AstFrame *bf;
    AstFrame *target, *template;
 
+   astBegin_();
+
+   sf = astSkyFrame( " ", status );
+   df = astSpecFrame( " ", status );
+   cf = astCmpFrame( df, sf, " ", status );
+   bf = astFrame( 2, "Domain=SKY", status );
 
    fs = astConvert( bf, sf, " " );
    if( fs ) {
@@ -223,6 +233,8 @@ int main( void ){
 
 
 
+
+   astEnd_( status );
 
    if( astOK ) {
       printf(" All astConvert tests passed\n");
