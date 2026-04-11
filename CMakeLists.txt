@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.24)
 
-# Version is defined to match configure.ac
+# Keep the canonical version in version.number so CMake and Autotools
+# both read the same value.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/version.number" AST_VERSION)
+string(STRIP "${AST_VERSION}" AST_VERSION)
+
 project(ast
-    VERSION 9.3.1
+    VERSION "${AST_VERSION}"
     LANGUAGES C
     DESCRIPTION "AST - World Coordinate Systems Library"
 )

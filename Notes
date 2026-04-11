@@ -70,8 +70,8 @@ To build from the repository, do
 Conventions and facilities so far
 ---------------------------------
 
-The version number is set in the AC_INIT line in configure.ac, and
-propagated from there to the locations where it's needed.
+The version number is set in version.number, and both configure.ac and
+CMakeLists.txt read it from there.
 
 The string @STAR_BOILERPLATE@ must be in Makefile.{am,in}.  All this
 does at present is include boilerplate for calling messgen _if_
