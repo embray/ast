@@ -53,6 +53,7 @@ make install
 | `--with-starmem` | Use Starlink memory management library |
 | `--with-memdebug` | Enable memory leak debugging |
 | `--without-topinclude` | Install headers only in `includedir/star` |
+| `--without-stardocs` | Build without building the documentation |
 
 ## Building with CMake
 
