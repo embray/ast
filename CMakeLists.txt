@@ -333,7 +333,6 @@ add_custom_command(
             "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_ast_err_h.cmake"
     COMMENT "Generating ast_err.h from ast_err.msg"
 )
-add_custom_target(ast_err_h DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h")
 
 # ============================================================
 # Configure object.h (substitute @THREADS@)
@@ -465,7 +464,11 @@ add_custom_command(
     DEPENDS ${MAKEH_DEPS}
     COMMENT "Generating ast.h"
 )
-add_custom_target(ast_header DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ast.h")
+add_custom_target(ast_codegen
+    DEPENDS
+        "${CMAKE_CURRENT_BINARY_DIR}/ast.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
+)
 
 # ============================================================
 # Fortran support: astbad utility and AST_PAR generation
@@ -691,7 +694,7 @@ if(AST_BUILD_FORTRAN)
 endif()
 
 add_library(ast ${AST_SOURCES})
-add_dependencies(ast ast_header ast_err_h)
+add_dependencies(ast ast_codegen)
 if(AST_BUILD_FORTRAN)
     add_dependencies(ast ast_par)
 endif()
@@ -779,7 +782,7 @@ add_library(ast_err STATIC src/err_null.c)
 target_include_directories(ast_err PRIVATE ${SATELLITE_INCLUDES})
 target_compile_definitions(ast_err PRIVATE HAVE_CONFIG_H)
 set_target_properties(ast_err PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_dependencies(ast_err ast_err_h)
+add_dependencies(ast_err ast_codegen)
 ast_apply_dev_options(ast_err)
 
 # ============================================================
@@ -795,7 +798,7 @@ if(PLPLOT_FOUND)
     target_include_directories(ast_grf_plplot PRIVATE ${SATELLITE_INCLUDES} ${PLPLOT_INCLUDE_DIRS})
     target_compile_definitions(ast_grf_plplot PRIVATE HAVE_CONFIG_H)
     set_target_properties(ast_grf_plplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_dependencies(ast_grf_plplot ast_err_h)
+    add_dependencies(ast_grf_plplot ast_codegen)
     ast_apply_dev_options(ast_grf_plplot)
 
     # plstrl() computes string width in mm but is a private PLplot symbol.
@@ -824,25 +827,25 @@ endif()
 add_library(ast_grf_2.0 STATIC src/grf_2.0.c)
 target_include_directories(ast_grf_2.0 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_2.0 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_dependencies(ast_grf_2.0 ast_err_h)
+add_dependencies(ast_grf_2.0 ast_codegen)
 ast_apply_dev_options(ast_grf_2.0)
 
 add_library(ast_grf_3.2 STATIC src/grf_3.2.c)
 target_include_directories(ast_grf_3.2 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_3.2 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_dependencies(ast_grf_3.2 ast_err_h)
+add_dependencies(ast_grf_3.2 ast_codegen)
 ast_apply_dev_options(ast_grf_3.2)
 
 add_library(ast_grf_5.6 STATIC src/grf_5.6.c)
 target_include_directories(ast_grf_5.6 PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf_5.6 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_dependencies(ast_grf_5.6 ast_err_h)
+add_dependencies(ast_grf_5.6 ast_codegen)
 ast_apply_dev_options(ast_grf_5.6)
 
 add_library(ast_grf3d STATIC src/grf3d.c)
 target_include_directories(ast_grf3d PRIVATE ${SATELLITE_INCLUDES})
 set_target_properties(ast_grf3d PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_dependencies(ast_grf3d ast_err_h)
+add_dependencies(ast_grf3d ast_codegen)
 ast_apply_dev_options(ast_grf3d)
 
 # ============================================================
