@@ -84,12 +84,16 @@ f     The YamlChan class does not define any new routines beyond those
 
 *  Authors:
 *     DSB: David Berry (EAO)
+*     EMB: E. Madison Bray (STScI)
 
 *  History:
 *     30-APR-2020 (DSB):
 *        Original version.
 *     5-OCT-2020 (DSB):
 *        Add a NAITVE encoding option (see YamlEncoding attribute).
+*     13-APR-2025 (EMB):
+*        - Adapted to never versions of ASDF transform schemas.
+*        - Added support for the gwcs/spherical_cartesian transform.
 *class--
 */
 
@@ -17860,11 +17864,6 @@ static AstKeyMap *WriteSphMap( AstYamlChan *this, AstSphMap *map,
 *     direction (Cartesian to spherical, in radians) corresponds to the
 *     ASDF cartesian_to_spherical direction. If the SphMap is inverted,
 *     the spherical_to_cartesian direction is used instead.
-*
-*     Note: the ASDF spherical_cartesian schema uses degrees for the
-*     spherical coordinates, whereas the AST SphMap uses radians. Callers
-*     that need exact degree convention compliance should use the
-*     ZoomMap+SphMap pattern detected by FindSphericalCartesian.
 
 *  Parameters:
 *     this
