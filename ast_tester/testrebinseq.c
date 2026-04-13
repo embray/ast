@@ -165,6 +165,8 @@ static void addnoise( int n, double *array, double sigma, int *status ) {
    mm = (AstMapping *) astMathMap( 1, 1, 1, fwd_ptr, 1, inv_ptr, " " );
    if( !astOK || !mm ) return;
 
+   astSet( mm, "Seed=1" );
+
    nused = BUFSIZE;
    for( i = 0; i < n; i++ ) {
       if( nused == BUFSIZE ) {
