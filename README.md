@@ -1,6 +1,7 @@
 # AST -- World Coordinate Systems Library
 
-The Starlink AST library provides a comprehensive range of facilities for
+The Starlink [AST library](https://starlink.eao.hawaii.edu/starlink/AST) provides
+a comprehensive range of facilities for
 attaching world coordinate systems to astronomical data, for
 retrieving and interpreting that information in a variety of formats,
 including FITS-WCS, and for generating graphical output based on it.
@@ -12,8 +13,8 @@ AST is portable and environment-independent.
 
 Full documentation is available in the Starlink User Notes:
 
-- [SUN/210](https://www.starlink.ac.uk/docs/sun210.htx/sun210.html) -- AST programmer's guide
-- [SUN/211](https://www.starlink.ac.uk/docs/sun211.htx/sun211.html) -- AST class reference
+- [SUN/210](https://starlink.eao.hawaii.edu/devdocs/sun210.htx/sun210.html) -- Fortran documentation
+- [SUN/211](https://starlink.eao.hawaii.edu/devdocs/sun211.htx/sun211.html) -- C documentation
 
 ## Building with Starlink Autotools
 
