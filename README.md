@@ -58,6 +58,9 @@ make install
 ## Building with CMake
 
 The CMake build does not require any Starlink infrastructure.
+It is an experimental build system that is currently solely used to simplify testing in a Starlink-less environment.
+For this reason it has no support for building documentation (it assumes `prolat` is not available).
+Additionally we have not tested the installation target and there is no facility for making a distribution tar file using CMake.
 
 ### Prerequisites
 
