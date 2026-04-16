@@ -819,6 +819,16 @@ if(PLPLOT_FOUND)
     if(HAVE_PLSTRL)
         target_compile_definitions(ast_grf_plplot PRIVATE HAVE_PLSTRL)
     endif()
+
+    add_library(ast_grf3d_plplot STATIC src/grf3d_plplot.c)
+    target_include_directories(ast_grf3d_plplot PRIVATE ${SATELLITE_INCLUDES} ${PLPLOT_INCLUDE_DIRS})
+    target_compile_definitions(ast_grf3d_plplot PRIVATE HAVE_CONFIG_H)
+    set_target_properties(ast_grf3d_plplot PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    add_dependencies(ast_grf3d_plplot ast_codegen)
+    ast_apply_dev_options(ast_grf3d_plplot)
+    if(HAVE_PLSTRL)
+        target_compile_definitions(ast_grf3d_plplot PRIVATE HAVE_PLSTRL)
+    endif()
 endif()
 
 # ============================================================
@@ -930,7 +940,7 @@ install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d
 )
 
 if(PLPLOT_FOUND)
-    install(TARGETS ast_grf_plplot
+    install(TARGETS ast_grf_plplot ast_grf3d_plplot
         EXPORT astTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -943,6 +953,7 @@ set(AST_INSTALL_HEADERS
     "${CMAKE_CURRENT_BINARY_DIR}/ast_err.h"
     src/grf.h
     src/grf3d.h
+    src/pl3d.h
 )
 if(AST_BUILD_FORTRAN)
     list(APPEND AST_INSTALL_HEADERS
