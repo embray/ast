@@ -59,11 +59,9 @@
 /* Macros */
 /* ====== */
 #define MXDEV 16                 /* Max no of concurrent PLplot streams */
-#define MXSTRLEN 80              /* Max string length for truncation */
 #define CAMERA_OK 123456789      /* Flags that a Camera has been initialised */
 #define TWOPI 6.28318530718      /* 2*PI */
 #define MXSIDE 32                /* Max no of sides in a marker polygon */
-#define R2D 57.29578             /* Radians to degrees factor */
 
 
 /* Header files. */
@@ -678,12 +676,10 @@ int astG3DText( const char *text, float ref[3], const char *just, float up[3],
 /* Local Variables: */
    char newjust[3];
    float tx[3], ty[3], tz[3];
-   float bl[3];
-   float xb[4], yb[4], zb[4];
    float h_ref, r_ref;
    float h_right, r_right;
    float h_up, r_up;
-   float ref2[3], right2[3], up2[3];
+   float right2[3], up2[3];
    PLFLT fjust, dx, dy;
 
 /* If the text has no printable characters, return without error. */
@@ -692,10 +688,6 @@ int astG3DText( const char *text, float ref[3], const char *just, float up[3],
 /* Create unit vectors along the three axes of the text plane
    coordinate system. */
    if( !getTextAxes( ref, up, norm, just, tx, ty, tz, newjust ) ) return 0;
-
-/* Get the bounding box and baseline position to determine where text
-   should be rendered. */
-   if( !TxExt3D( text, ref, newjust, tx, ty, tz, xb, yb, zb, bl ) ) return 0;
 
 /* Project the reference point to 2D screen coordinates. */
    if( !transform( NULL, 1, &ref[0], &ref[1], &ref[2], &h_ref, &r_ref ) ) return 0;
