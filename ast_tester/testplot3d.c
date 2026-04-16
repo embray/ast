@@ -52,6 +52,52 @@ static void stopit( int *status, const char *text ) {
    printf( "%s\n", text );
 }
 
+/* checkdump: serialization round-trip test using astToString/astFromString */
+static AstObject *checkDump( AstObject *obj, const char *text, int *status ) {
+   char *pickle;
+   char *pickle2;
+   AstObject *result;
+
+   if( *status != 0 ) return NULL;
+
+   pickle = astToString( obj );
+   if( !pickle ) {
+      printf( "%s\n", text );
+      stopit( status, "checkDump: cannot write object" );
+      return NULL;
+   }
+
+   result = astFromString( pickle );
+   if( !result ) {
+      pickle = astFree( pickle );
+      printf( "%s\n", text );
+      stopit( status, "checkDump: cannot read object" );
+      return NULL;
+   }
+
+   /* Re-serialize the round-tripped object and compare */
+   pickle2 = astToString( result );
+   if( !pickle2 ) {
+      pickle = astFree( pickle );
+      printf( "%s\n", text );
+      stopit( status, "checkDump: cannot re-write object" );
+      astAnnul( result );
+      return NULL;
+   }
+
+   if( strcmp( pickle, pickle2 ) != 0 ) {
+      printf( "%s\n", text );
+      stopit( status, "checkDump: object has changed after round-trip" );
+      astAnnul( result );
+      result = NULL;
+   }
+
+   pickle = astFree( pickle );
+   pickle2 = astFree( pickle2 );
+
+   return result;
+}
+
 /* Read an AST object from a text file by reading the whole file into
    a string and passing it to astFromString. */
 static AstObject *readTest( const char *name, int *status ) {
@@ -122,6 +168,7 @@ static void setupDevice( const char *output ) {
 int main( int argc, char **argv ) {
    int status = 0;
    AstPlot3D *plot3d;
+   AstObject *obj;
    AstObject *fset;
    float lbnd[3], ubnd[3];
    float gbox[6];
@@ -164,11 +211,16 @@ int main( int argc, char **argv ) {
    gbox[0] = lbnd[0];  gbox[1] = lbnd[1];  gbox[2] = lbnd[2];
    gbox[3] = ubnd[0];  gbox[4] = ubnd[1];  gbox[5] = ubnd[2];
 
-   /* Note: CheckDump of Plot3D is skipped because plot.c:GrfItem has a
-      pre-existing buffer overflow in its Dump function that is caught by
-      the address sanitizer. This is not related to grf3d_plplot. */
+   bbox[0] = -1.0;  bbox[1] = -1.0;  bbox[2] = -1.0;
+   bbox[3] =  1.0;  bbox[4] =  1.0;  bbox[5] =  1.0;
 
-   /* === Load a FrameSet and draw a 3D grid === */
+   /* === Test 1: CheckDump of a basic Plot3D === */
+   plot3d = astPlot3D( AST__NULL, gbox, bbox, "minticklen=0" );
+   obj = checkDump( (AstObject *)plot3d, "CheckDump test 1", &status );
+   if( obj ) astAnnul( obj );
+   astAnnul( plot3d );
+
+   /* === Test 2: Load a FrameSet and draw a 3D grid === */
    fset = readTest( "plot3d-test1.ast", &status );
    if( fset && status == 0 ) {
       bbox[0] = 0.5;    bbox[1] = 0.5;    bbox[2] = 0.5;
