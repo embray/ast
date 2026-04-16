@@ -144,4 +144,13 @@ if(PLPLOT_FOUND)
     )
     target_include_directories(testplotter PRIVATE ${PLPLOT_INCLUDE_DIRS})
     target_link_directories(testplotter PRIVATE ${PLPLOT_LIBRARY_DIRS})
+
+    configure_file(plot3d-test1.ast "${CMAKE_CURRENT_BINARY_DIR}/plot3d-test1.ast" COPYONLY)
+    ast_add_test(testplot3d
+        NO_DEFAULT_GRF_LIBS
+        EXTRA_LIBS $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf_plplot> $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf3d_plplot> ${PLPLOT_LIBRARIES}
+        TEST_ARGS "testplot3d.pdf"
+    )
+    target_include_directories(testplot3d PRIVATE ${PLPLOT_INCLUDE_DIRS})
+    target_link_directories(testplot3d PRIVATE ${PLPLOT_LIBRARY_DIRS})
 endif()
