@@ -41,7 +41,7 @@ function(ast_add_test name)
     target_include_directories(${name} PRIVATE ${TEST_INCLUDES})
     
     if(T_NO_DEFAULT_GRF_LIBS)
-        set(TARGET_LIBS ast $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_err> m ${T_EXTRA_LIBS})
+        set(TARGET_LIBS ast $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_err> ${T_EXTRA_LIBS} m)
     else()
         set(TARGET_LIBS ${TEST_LIBS} ${T_EXTRA_LIBS})
     endif()
