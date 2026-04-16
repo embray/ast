@@ -122,6 +122,13 @@ configure_file(alt.header "${CMAKE_CURRENT_BINARY_DIR}/alt.header" COPYONLY)
 configure_file(sparse.ast "${CMAKE_CURRENT_BINARY_DIR}/sparse.ast" COPYONLY)
 ast_add_test(testfitschan_c SOURCES testfitschan.c)
 
+# --- wcsconverter: regression-diff harness ported from wcsconverter.f ---
+add_executable(wcsconverter wcsconverter.c)
+target_include_directories(wcsconverter PRIVATE ${TEST_INCLUDES})
+target_link_libraries(wcsconverter PRIVATE ${TEST_LIBS})
+target_compile_definitions(wcsconverter PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(wcsconverter)
+
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
 endif()
