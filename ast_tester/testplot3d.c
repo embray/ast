@@ -146,9 +146,13 @@ int main( int argc, char **argv ) {
    setupDevice( output );
    c_plinit();
 
-   /* Set up viewport and window. The 3D system needs a basic 2D viewport
-      established before the camera can project into it. */
-   c_plenv( 0.0, 1.0, 0.0, 1.0, 1, -2 );
+   /* Set up viewport and window. Use a viewport with small margins to
+      leave room for labels that extend beyond the 3D bounding volume.
+      c_plenv leaves too-large margins and its viewport clips 3D content;
+      a full-page viewport (0,1,0,1) pushes labels off the page edge. */
+   c_pladv( 0 );
+   c_plvpor( 0.08, 0.92, 0.08, 0.92 );
+   c_plwind( 0.0, 1.0, 0.0, 1.0 );
 
    /* Set up the camera for this 3D bounding box */
    if( !PL3DAutoCamera( lbnd, ubnd ) ) {
