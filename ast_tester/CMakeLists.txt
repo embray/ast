@@ -129,6 +129,47 @@ target_link_libraries(wcsconverter PRIVATE ${TEST_LIBS})
 target_compile_definitions(wcsconverter PRIVATE HAVE_CONFIG_H)
 ast_apply_dev_options(wcsconverter)
 
+# Helper to register one wcsconverter regression-diff test.
+# Each call copies the input + reference file into the build tree and
+# registers a single ctest whose command is a cmake -P invocation of
+# run_wcsconverter_test.cmake.  Adding a new fixture is a one-line
+# add_wcsconv_test(...) call below, plus dropping the input/reference
+# files into ast_tester/.
+function(add_wcsconv_test)
+    cmake_parse_arguments(W "" "NAME;INPUT;REFERENCE;ENCODING;ATTRS" "" ${ARGN})
+    if(NOT W_NAME OR NOT W_INPUT OR NOT W_REFERENCE OR NOT W_ENCODING)
+        message(FATAL_ERROR
+            "add_wcsconv_test: NAME, INPUT, REFERENCE, ENCODING all required")
+    endif()
+    if(NOT DEFINED W_ATTRS)
+        set(W_ATTRS "")
+    endif()
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${W_INPUT}"
+                   "${CMAKE_CURRENT_BINARY_DIR}/${W_INPUT}" COPYONLY)
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${W_REFERENCE}"
+                   "${CMAKE_CURRENT_BINARY_DIR}/${W_REFERENCE}" COPYONLY)
+    add_test(NAME wcsconv_${W_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DWCSCONVERTER=$<TARGET_FILE:wcsconverter>
+            -DIN_FILE=${W_INPUT}
+            -DREF_FILE=${W_REFERENCE}
+            -DOUT_FILE=${W_NAME}.out
+            -DENCODING=${W_ENCODING}
+            -DATTRS=${W_ATTRS}
+            -P "${CMAKE_SOURCE_DIR}/cmake/run_wcsconverter_test.cmake"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    if(AST_ENABLE_SANITIZERS)
+        set_tests_properties(wcsconv_${W_NAME} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    endif()
+endfunction()
+
+add_wcsconv_test(NAME timj_fits-wcs
+                 INPUT timj.ast
+                 REFERENCE timj.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,FitsDigits=8")
+
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
 endif()
