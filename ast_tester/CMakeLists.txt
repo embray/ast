@@ -129,14 +129,42 @@ target_link_libraries(wcsconverter PRIVATE ${TEST_LIBS})
 target_compile_definitions(wcsconverter PRIVATE HAVE_CONFIG_H)
 ast_apply_dev_options(wcsconverter)
 
-# Helper to register one wcsconverter regression-diff test.
+# wcs_astequal: pair-wise semantic equivalence check for FrameSet files.
+# Used alongside the string diff for platform-robust verification.
+add_executable(wcs_astequal wcs_astequal.c)
+target_include_directories(wcs_astequal PRIVATE ${TEST_INCLUDES})
+target_link_libraries(wcs_astequal PRIVATE ${TEST_LIBS})
+target_compile_definitions(wcs_astequal PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(wcs_astequal)
+
+# Helper to register wcsconverter regression tests.
 # Each call copies the input + reference file into the build tree and
-# registers a single ctest whose command is a cmake -P invocation of
-# run_wcsconverter_test.cmake.  Adding a new fixture is a one-line
-# add_wcsconv_test(...) call below, plus dropping the input/reference
-# files into ast_tester/.
+# registers two ctest entries:
+#   wcsconv_<NAME>          -- byte-level diff of the produced output
+#                              against the committed reference.  Catches
+#                              unintentional changes to AST's output
+#                              format.
+#   wcsconv_<NAME>_astequal -- astEqual-based semantic check between the
+#                              output and the reference.  Tolerates
+#                              platform-specific serialisation and ulp
+#                              drift.
+# Adding a new fixture is a one-line add_wcsconv_test(...) call below,
+# plus dropping the input/reference files into ast_tester/.
+#
+# Options:
+#   SKIP_STRING_COMPARE -- register the astEqual test only; do not
+#                          register the byte-level string-diff test.
+#                          Use for fixtures whose serialised output is
+#                          known to vary at the ulp level between
+#                          platforms' math libraries, where a strict
+#                          byte-diff is not a reliable regression gate
+#                          on any single platform.
 function(add_wcsconv_test)
-    cmake_parse_arguments(W "" "NAME;INPUT;REFERENCE;ENCODING;ATTRS" "" ${ARGN})
+    cmake_parse_arguments(W
+        "SKIP_STRING_COMPARE"
+        "NAME;INPUT;REFERENCE;ENCODING;ATTRS"
+        ""
+        ${ARGN})
     if(NOT W_NAME OR NOT W_INPUT OR NOT W_REFERENCE OR NOT W_ENCODING)
         message(FATAL_ERROR
             "add_wcsconv_test: NAME, INPUT, REFERENCE, ENCODING all required")
@@ -148,18 +176,37 @@ function(add_wcsconv_test)
                    "${CMAKE_CURRENT_BINARY_DIR}/${W_INPUT}" COPYONLY)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${W_REFERENCE}"
                    "${CMAKE_CURRENT_BINARY_DIR}/${W_REFERENCE}" COPYONLY)
-    add_test(NAME wcsconv_${W_NAME}
+
+    if(NOT W_SKIP_STRING_COMPARE)
+        add_test(NAME wcsconv_${W_NAME}
+            COMMAND ${CMAKE_COMMAND}
+                -DWCSCONVERTER=$<TARGET_FILE:wcsconverter>
+                -DIN_FILE=${W_INPUT}
+                -DREF_FILE=${W_REFERENCE}
+                -DOUT_FILE=${W_NAME}.out
+                -DENCODING=${W_ENCODING}
+                -DATTRS=${W_ATTRS}
+                -P "${CMAKE_SOURCE_DIR}/cmake/run_wcsconverter_test.cmake"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+        if(AST_ENABLE_SANITIZERS)
+            set_tests_properties(wcsconv_${W_NAME} PROPERTIES
+                ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+        endif()
+    endif()
+
+    add_test(NAME wcsconv_${W_NAME}_astequal
         COMMAND ${CMAKE_COMMAND}
             -DWCSCONVERTER=$<TARGET_FILE:wcsconverter>
+            -DWCS_ASTEQUAL=$<TARGET_FILE:wcs_astequal>
             -DIN_FILE=${W_INPUT}
             -DREF_FILE=${W_REFERENCE}
-            -DOUT_FILE=${W_NAME}.out
+            -DOUT_FILE=${W_NAME}.astequal.out
             -DENCODING=${W_ENCODING}
             -DATTRS=${W_ATTRS}
-            -P "${CMAKE_SOURCE_DIR}/cmake/run_wcsconverter_test.cmake"
+            -P "${CMAKE_SOURCE_DIR}/cmake/run_wcsconverter_astequal_test.cmake"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     if(AST_ENABLE_SANITIZERS)
-        set_tests_properties(wcsconv_${W_NAME} PROPERTIES
+        set_tests_properties(wcsconv_${W_NAME}_astequal PROPERTIES
             ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
     endif()
 endfunction()
@@ -192,7 +239,8 @@ add_wcsconv_test(NAME timj_native
                  INPUT timj.ast
                  REFERENCE timj.native
                  ENCODING native
-                 ATTRS "FitsDigits=8")
+                 ATTRS "FitsDigits=8"
+                 SKIP_STRING_COMPARE)
 
 add_wcsconv_test(NAME a20070718_fits-wcs
                  INPUT a20070718_00010_02_cube.ast
