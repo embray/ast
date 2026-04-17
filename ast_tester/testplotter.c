@@ -33,7 +33,13 @@ int main(int argc, char **argv) {
     AstPlot *pl;
     char *file, *attr1, *attr2, *psfile;
     FILE *fp;
-    char card[81];
+    /* Buffer must exceed 80 so the 80-char FITS card plus its line
+       terminator fits in a single fgets() call.  An 81-byte buffer
+       reads only 80 chars and leaves the newline in the stream, so
+       the next call returns a lone newline that becomes an empty
+       card — fatal for CONTINUE cards which must immediately follow
+       their parent. */
+    char card[256];
     double pbox[4];
     float gbox[4];
     float range, delta, asp;
@@ -62,10 +68,9 @@ int main(int argc, char **argv) {
     }
 
     while (fgets(card, sizeof(card), fp) != NULL) {
-        /* Strip newline if present to match Fortran read */
         size_t len = strlen(card);
-        if (len > 0 && card[len-1] == '\n') {
-            card[len-1] = '\0';
+        while (len > 0 && (card[len-1] == '\n' || card[len-1] == '\r')) {
+            card[--len] = '\0';
         }
         astPutFits(fc, card, 0);
     }
