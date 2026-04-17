@@ -85,6 +85,9 @@ f     The MathMap class does not define any new routines beyond those
 *        Re-implement the Equal method to avoid use of astSimplify.
 *     30-AUG-2012 (DSB):
 *        Fix bug in undocumented Gaussian noise function.
+*     16-APR-2026 (DSB):
+*        Equal(): use astEQUAL instead of raw != when comparing the
+*        compiled-expression constant operands.
 *class--
 */
 
@@ -1726,8 +1729,8 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
                              code == OP_MAX ||
                              code == OP_MIN ) {
 
-                     if( this_con[ ifun ][ icon ] !=
-                         that_con[ ifun ][ icon ] ) {
+                     if( !astEQUAL( this_con[ ifun ][ icon ],
+                                    that_con[ ifun ][ icon ] ) ) {
                         result = 0;
                      } else {
                         icon++;

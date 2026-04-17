@@ -98,6 +98,10 @@ f     The DssMap class does not define any new routines beyond those
 *     8-APR-2026 (TIMJ):
 *        Convert K&R-style function declarations to ANSI prototypes
 *        for platepos and platepix.
+*     16-APR-2026 (DSB):
+*        Equal(): use astEQUAL for the WorldCoor double-precision fields
+*        instead of raw == / != so platform ulp drift in FITS-derived
+*        header values does not cause spurious inequality.
 *class--
 */
 
@@ -280,19 +284,19 @@ static int Equal( AstObject *this_object, AstObject *that_object, int *status ) 
             this_wcs = ( struct WorldCoor *) this->wcs;
             that_wcs = ( struct WorldCoor *) that->wcs;
 
-            if( this_wcs->x_pixel_offset == that_wcs->x_pixel_offset &&
-                this_wcs->y_pixel_offset == that_wcs->y_pixel_offset &&
-                this_wcs->ppo_coeff[2] == that_wcs->ppo_coeff[2] &&
-                this_wcs->ppo_coeff[5] == that_wcs->ppo_coeff[5] &&
-                this_wcs->x_pixel_size == that_wcs->x_pixel_size &&
-                this_wcs->y_pixel_size == that_wcs->y_pixel_size &&
-                this_wcs->plate_dec == that_wcs->plate_dec &&
-                this_wcs->plate_ra == that_wcs->plate_ra ) {
+            if( astEQUAL( this_wcs->x_pixel_offset, that_wcs->x_pixel_offset ) &&
+                astEQUAL( this_wcs->y_pixel_offset, that_wcs->y_pixel_offset ) &&
+                astEQUAL( this_wcs->ppo_coeff[2], that_wcs->ppo_coeff[2] ) &&
+                astEQUAL( this_wcs->ppo_coeff[5], that_wcs->ppo_coeff[5] ) &&
+                astEQUAL( this_wcs->x_pixel_size, that_wcs->x_pixel_size ) &&
+                astEQUAL( this_wcs->y_pixel_size, that_wcs->y_pixel_size ) &&
+                astEQUAL( this_wcs->plate_dec, that_wcs->plate_dec ) &&
+                astEQUAL( this_wcs->plate_ra, that_wcs->plate_ra ) ) {
 
                 result = 1;
                 for( i = 0; i < 13; i++ ) {
-                   if( this_wcs->amd_x_coeff[i] != that_wcs->amd_x_coeff[i] ||
-                       this_wcs->amd_y_coeff[i] != that_wcs->amd_y_coeff[i] ) {
+                   if( !astEQUAL( this_wcs->amd_x_coeff[i], that_wcs->amd_x_coeff[i] ) ||
+                       !astEQUAL( this_wcs->amd_y_coeff[i], that_wcs->amd_y_coeff[i] ) ) {
                       result = 0;
                       break;
                    }
