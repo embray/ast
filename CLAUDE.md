@@ -97,13 +97,13 @@ for current status and priorities.
 - Error handling via integer status variable and `astOK` macro
 - Function naming: `astFoo` (public macro), `astFoo_` (internal C function)
 - No Starlink dependencies in CMake build path
+- C11 must be used for all tests that involve serialization to native form
+  because AST_DBL_DIG = 18 in C99 mode but 17 in C11 mode.
 
 ## Important notes
 
 - When making fixes to the files in src/ ensure that the history in the prologue
   is updated with the change.
 - Keep `PLAN.md` updated as work progresses on test conversions
-- `astEqual` segfaults on some classes (e.g. SpecFluxFrame) — avoid using it
-  without testing first
 - The `WHOLE_ARCHIVE` linking pattern in `ast_tester/CMakeLists.txt` is
   critical — without it, tests segfault on null function pointers
