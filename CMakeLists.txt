@@ -867,6 +867,14 @@ set_target_properties(ast_grf3d PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(ast_grf3d ast_codegen)
 ast_apply_dev_options(ast_grf3d)
 
+# Logging/virtual graphics library (no external dependencies)
+add_library(ast_grf_log STATIC src/grf_log.c)
+target_include_directories(ast_grf_log PRIVATE ${SATELLITE_INCLUDES})
+target_compile_definitions(ast_grf_log PRIVATE HAVE_CONFIG_H)
+set_target_properties(ast_grf_log PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_dependencies(ast_grf_log ast_codegen)
+ast_apply_dev_options(ast_grf_log)
+
 # ============================================================
 # Test program
 # ============================================================
@@ -941,7 +949,7 @@ endif()
 # ============================================================
 # Installation
 # ============================================================
-install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d
+install(TARGETS ast ast_err ast_grf_2.0 ast_grf_3.2 ast_grf_5.6 ast_grf3d ast_grf_log
     EXPORT astTargets
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

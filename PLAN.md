@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 85 default tests + 20 conditional (PLplot) + 1 optional huge stress test
+## Current status: 106 default tests + 20 conditional (PLplot) + 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -27,9 +27,10 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 9: Simplify regression harness | **Complete** (3 tests from simplify.f) |
 | Phase 2 Batch 10: Plotter smoke tests | **Complete** (20 tests, conditional on PLplot) |
 | Phase 2 Batch 11: .head native round-trip tests | **Complete** (20 wcsconv tests from .head files) |
+| Phase 2 Batch 12: Grid smoke tests (no PLplot) | **Complete** (21 tests via logging GRF plugin) |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (85 default + 20 conditional PLplot + 1 optional)
+### Test inventory (106 default + 20 conditional PLplot + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -53,7 +54,15 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
   on each .head file with .attr/.fattr/.box companions to verify astGrid doesn't crash
 - Batch 11: 20 × wcsconv_*_native_astequal tests — round-trip .head files through
   wcsconverter in native encoding and verify semantic equivalence via ast_astequal
-- Optional manual stress test: testhuge_c
+
+**Grid smoke tests using logging GRF (21 default):**
+- Batch 12: testgrid + 20 × grid_* smoke tests — run testgrid on each .head
+  file using the logging GRF plugin (grf_log.c) which provides a virtual
+  viewport with no PLplot dependency. Same .head/.attr/.fattr/.box fixtures
+  as Batch 10.
+
+**Optional manual stress test:**
+- testhuge_c
 
 ## Phase 1 details (complete)
 
@@ -209,5 +218,5 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 85 default tests (+ 20 conditional PLplot plotter smoke tests),
+Shows 106 default tests (+ 20 conditional PLplot plotter smoke tests),
 all passing (minus pre-existing testresimp segfault).

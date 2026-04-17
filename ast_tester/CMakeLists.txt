@@ -527,6 +527,156 @@ if(HAVE_PTHREADS)
     ast_add_test(testthreads EXTRA_LIBS Threads::Threads)
 endif()
 
+# --- Grid smoke tests (no PLplot dependency) ---
+# Uses the logging GRF module (grf_log.c) to exercise astGrid on each
+# .head file without requiring any external graphics library.
+configure_file(lsst.fits-wcs "${CMAKE_CURRENT_BINARY_DIR}/lsst.fits-wcs" COPYONLY)
+ast_add_test(testgrid
+    NO_DEFAULT_GRF_LIBS
+    EXTRA_LIBS $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf_log>
+               $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf3d>
+    TEST_ARGS "lsst.fits-wcs" " " " "
+)
+target_include_directories(testgrid PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+function(add_grid_test)
+    cmake_parse_arguments(P ""
+        "NAME;HEAD;ATTR;FATTR;BOX"
+        ""
+        ${ARGN})
+    if(NOT P_NAME OR NOT P_HEAD)
+        message(FATAL_ERROR
+            "add_grid_test: NAME, HEAD required")
+    endif()
+    if(NOT DEFINED P_ATTR)
+        set(P_ATTR " ")
+    endif()
+    if(NOT DEFINED P_FATTR)
+        set(P_FATTR " ")
+    endif()
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${P_HEAD}"
+                   "${CMAKE_CURRENT_BINARY_DIR}/${P_HEAD}" COPYONLY)
+
+    set(_box_arg "")
+    if(DEFINED P_BOX)
+        set(_box_arg "${P_BOX}")
+    endif()
+
+    add_test(NAME grid_${P_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DTESTGRID=$<TARGET_FILE:testgrid>
+            -DHEAD_FILE=${P_HEAD}
+            "-DATTR=${P_ATTR}"
+            "-DFATTR=${P_FATTR}"
+            "-DBOX=${_box_arg}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/run_grid_test.cmake"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    if(AST_ENABLE_SANITIZERS)
+        set_tests_properties(grid_${P_NAME} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    endif()
+endfunction()
+
+add_grid_test(NAME aitoff
+              HEAD aitoff.head
+              ATTR "Grid=1,tickall=0,border=1,tol=0.001"
+              BOX "10.0 -10.0 300.0 280.0")
+
+add_grid_test(NAME car1
+              HEAD car1.head
+              ATTR "numlabgap=0.05"
+              FATTR "carlin=1"
+              BOX "0 0 2962 562")
+
+add_grid_test(NAME car2
+              HEAD car2.head
+              ATTR "numlabgap(2)=0.05,labelling=interior"
+              FATTR "carlin=1"
+              BOX "0 0 2962 562")
+
+add_grid_test(NAME car3
+              HEAD car3.head
+              ATTR "grid=1"
+              BOX "0 0 400 400")
+
+add_grid_test(NAME car4
+              HEAD car4.head
+              ATTR "format(1)=gd,format(2)=gd,Grid=1,tickall=0,width(axes)=3"
+              FATTR "carlin=1"
+              BOX "0 0 951 1851")
+
+add_grid_test(NAME car5
+              HEAD car5.head
+              ATTR "border=1"
+              BOX "0 0 951 1851")
+
+add_grid_test(NAME car6
+              HEAD car6.head
+              ATTR "format(1)=ghms,format(2)=gdm,edge(2)=r,tickall=0,grid=1"
+              BOX "0 0 5401 1741")
+
+add_grid_test(NAME cobe
+              HEAD cobe.head
+              ATTR "Grid=0,labelling=exterior,gap(1)=50"
+              BOX "10.0 -10.0 300.0 280.0")
+
+add_grid_test(NAME hpx
+              HEAD hpx.head
+              ATTR "Grid=1,labelling=interior,bottom(1)=0"
+              BOX "0.5 0.5 300.5 200.5")
+
+add_grid_test(NAME origin
+              HEAD origin.head
+              ATTR "Grid=1,labelling=int"
+              BOX "0 0 500 500")
+
+add_grid_test(NAME polco
+              HEAD polco.head
+              ATTR "border=1"
+              BOX "-300 -300 500 500")
+
+add_grid_test(NAME polco2
+              HEAD polco2.head
+              BOX "-300 -300 500 500")
+
+add_grid_test(NAME scp
+              HEAD scp.head
+              ATTR "border=1"
+              BOX "1.0 1.0 1500.0 1300.0")
+
+add_grid_test(NAME serpens
+              HEAD serpens.head
+              BOX "0.5 0.5 150.5 120.5")
+
+add_grid_test(NAME specflux
+              HEAD specflux.head
+              ATTR "system=freq,logplot=1,loggap(1)=100"
+              BOX "1 3 1.0E-8 9")
+
+add_grid_test(NAME timeplot
+              HEAD timeplot.head
+              ATTR "minticklen=0.02,majticklen=0.05,gap(2)=0.1,NumLabGap=0.05,textlabgap=0.1,size=0.9"
+              BOX "0.046 3.0 1.008 3.3")
+
+add_grid_test(NAME tnx
+              HEAD tnx.head
+              ATTR "Grid=1,textlabgap=0.1,border=0"
+              BOX "0.0 0.0 2048.0 4096.0")
+
+add_grid_test(NAME tsc
+              HEAD tsc.head
+              ATTR "border=1"
+              BOX "1 1 1600 1600")
+
+add_grid_test(NAME zpn
+              HEAD zpn.head
+              ATTR "tol=0.0001"
+              BOX "1 1 200.0 200.0")
+
+add_grid_test(NAME zpx
+              HEAD zpx.head
+              ATTR "Grid=1,style(grid1)=2,size(textlab2)=2")
+
 if(PLPLOT_FOUND)
     configure_file(lsst.fits-wcs "${CMAKE_CURRENT_BINARY_DIR}/lsst.fits-wcs" COPYONLY)
     ast_add_test(testplotter
