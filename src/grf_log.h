@@ -36,6 +36,7 @@
 #include <stdio.h>
 
 void astGrfLogInit( FILE *logfile );
+void astGrfLogSetSvg( FILE *svgfile, int width, int height );
 void astGrfLogClose( void );
 
 #endif

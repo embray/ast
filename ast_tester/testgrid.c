@@ -7,10 +7,12 @@
 *     with no external graphics library dependency.
 *
 *  Usage:
-*     testgrid <fits file> <attr> <fattr> [<logfile>] [<xlo> <ylo> <xhi> <yhi>]
+*     testgrid <fits file> <attr> <fattr> [<outfile>] [<xlo> <ylo> <xhi> <yhi>]
 *
-*     If <logfile> is "-" or omitted, no GRF log is written (smoke-test
-*     mode).  If a path is given, every GRF call is logged to that file.
+*     If <outfile> is "-" or omitted, no output is written (smoke-test
+*     mode).  If a path ending in ".svg" is given, an SVG image is
+*     produced.  Otherwise a GRF call log is written for regression
+*     testing.
 *
 *  Description:
 *     Reads a FITS header from <fits file>, builds a FrameSet via
@@ -40,6 +42,7 @@ int main( int argc, char **argv ) {
    char *file, *attr1, *attr2;
    FILE *fp;
    FILE *logfp = NULL;
+   FILE *svgfp = NULL;
    char card[256];
    double pbox[4];
    float gbox[4];
@@ -59,21 +62,27 @@ int main( int argc, char **argv ) {
    attr1 = argv[2];
    attr2 = argv[3];
 
-   /* Determine whether a log file or BOX arguments follow. */
+   /* Determine whether a log/SVG file or BOX arguments follow. */
    arg_offset = 4;
    if( argc > 4 ) {
-      /* If the 5th arg looks like a number, treat it as the start of
-         BOX coordinates.  Otherwise treat it as a log file path. */
       char *endp;
       (void)strtod( argv[4], &endp );
       if( endp != argv[4] && *endp == '\0' ) {
-         /* Numeric — this is xlo, no log file given */
          arg_offset = 4;
       } else if( strcmp( argv[4], "-" ) != 0 ) {
-         logfp = fopen( argv[4], "w" );
-         if( !logfp ) {
-            printf( "Failed to open log file %s\n", argv[4] );
-            return 1;
+         const char *ext = strrchr( argv[4], '.' );
+         if( ext && strcmp( ext, ".svg" ) == 0 ) {
+            svgfp = fopen( argv[4], "w" );
+            if( !svgfp ) {
+               printf( "Failed to open SVG file %s\n", argv[4] );
+               return 1;
+            }
+         } else {
+            logfp = fopen( argv[4], "w" );
+            if( !logfp ) {
+               printf( "Failed to open log file %s\n", argv[4] );
+               return 1;
+            }
          }
          arg_offset = 5;
       } else {
@@ -83,6 +92,7 @@ int main( int argc, char **argv ) {
 
    /* Initialise the logging GRF module. */
    astGrfLogInit( logfp );
+   if( svgfp ) astGrfLogSetSvg( svgfp, 720, 540 );
 
    fc = astFitsChan( NULL, NULL, "%s", attr2 );
 
@@ -175,6 +185,7 @@ int main( int argc, char **argv ) {
 
    astGrfLogClose();
    if( logfp ) fclose( logfp );
+   if( svgfp ) fclose( svgfp );
 
    return status == 0 ? 0 : 1;
 }

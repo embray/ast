@@ -59,9 +59,23 @@
 #define WORLD_Y_MAX     1.0
 #define DEFAULT_CHR_HT  4.0      /* mm, matches PLplot default */
 
+#define R2D 57.29577951308232    /* radians to degrees */
+
+/* PLplot-compatible colour map 0 (indices 0–15). */
+static const char *cmap0[] = {
+   "#000000", "#ff0000", "#ffff00", "#00ff00",
+   "#7fffd4", "#ffc0cb", "#f5deb3", "#808080",
+   "#a52a2a", "#0000ff", "#8a2be2", "#00ffff",
+   "#f0e68c", "#fa8072", "#c0c0c0", "#ffffff"
+};
+#define NCMAP0 16
+
 /* Static state. */
 /* ============= */
 static FILE *log_fp = NULL;
+static FILE *svg_fp = NULL;
+static int svg_w = 720;
+static int svg_h = 540;
 
 /* Attribute state: [GRF__TEXT=0, GRF__LINE=1, GRF__MARK=2] */
 static double attr_style[3]  = { 1.0, 1.0, 1.0 };
@@ -84,9 +98,50 @@ void astGrfLogInit( FILE *logfile ) {
    }
 }
 
+void astGrfLogSetSvg( FILE *svgfile, int width, int height ) {
+   svg_fp = svgfile;
+   svg_w = width;
+   svg_h = height;
+   if( svg_fp ) {
+      fprintf( svg_fp,
+         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+         "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+         "width=\"%d\" height=\"%d\" "
+         "viewBox=\"0 0 %d %d\">\n"
+         "<rect width=\"100%%\" height=\"100%%\" fill=\"black\"/>\n",
+         svg_w, svg_h, svg_w, svg_h );
+   }
+}
+
 void astGrfLogClose( void ) {
    if( log_fp ) fflush( log_fp );
    log_fp = NULL;
+   if( svg_fp ) {
+      fprintf( svg_fp, "</svg>\n" );
+      fflush( svg_fp );
+   }
+   svg_fp = NULL;
+}
+
+/* SVG helpers. */
+static float SvgX( float wx ) {
+   return wx * (float)svg_w;
+}
+
+static float SvgY( float wy ) {
+   return (float)svg_h - wy * (float)svg_h;
+}
+
+static const char *SvgColour( int prim ) {
+   int idx = (int)( attr_colour[prim] + 0.5 );
+   if( idx < 0 || idx >= NCMAP0 ) idx = 1;
+   return cmap0[idx];
+}
+
+static float SvgFontSize( void ) {
+   double scale = attr_size[GRF__TEXT];
+   if( scale <= 0.0 ) scale = 1.0;
+   return (float)( 14.0 * scale );
 }
 
 /* Helper: current character height in mm, accounting for size scaling. */
@@ -229,17 +284,57 @@ int astGText( const char *text, float x, float y, const char *just,
                just ? just[0] : '?', just ? just[1] : '?',
                upx, upy );
    }
+   if( svg_fp && text && text[0] != '\0' ) {
+      float sx = SvgX( x );
+      float sy = SvgY( y );
+      float fs = SvgFontSize();
+      double angle = -atan2( (double)upx, (double)upy ) * R2D;
+
+      const char *anchor = "middle";
+      const char *baseline = "central";
+      if( just ) {
+         switch( just[1] ) {
+            case 'L': anchor = "start";  break;
+            case 'R': anchor = "end";    break;
+            default:  anchor = "middle"; break;
+         }
+         switch( just[0] ) {
+            case 'T': baseline = "hanging";    break;
+            case 'B': baseline = "alphabetic"; break;
+            default:  baseline = "central";    break;
+         }
+      }
+
+      fprintf( svg_fp, "<text x=\"%.1f\" y=\"%.1f\" "
+               "font-family=\"sans-serif\" font-size=\"%.1f\" "
+               "fill=\"%s\" text-anchor=\"%s\" dominant-baseline=\"%s\"",
+               sx, sy, fs, SvgColour(GRF__TEXT), anchor, baseline );
+      if( fabs(angle) > 0.01 ) {
+         fprintf( svg_fp, " transform=\"rotate(%.1f,%.1f,%.1f)\"",
+                  angle, sx, sy );
+      }
+      fprintf( svg_fp, ">%s</text>\n", text );
+   }
    return 1;
 }
 
 int astGLine( int n, const float *x, const float *y ) {
    if( log_fp && n > 1 && x && y ) {
-      /* Skip zero-length lines (from == to) — these are degenerate
-         tick marks whose presence varies between platforms. */
       if( x[0] != x[n-1] || y[0] != y[n-1] ) {
          fprintf( log_fp, "GLine from=(%.3f,%.3f) to=(%.3f,%.3f)\n",
                   x[0], y[0], x[n-1], y[n-1] );
       }
+   }
+   if( svg_fp && n > 1 && x && y ) {
+      int i;
+      double w = attr_width[GRF__LINE];
+      if( w < 1.0 ) w = 1.0;
+      fprintf( svg_fp, "<polyline fill=\"none\" stroke=\"%s\" "
+               "stroke-width=\"%.1f\" points=\"", SvgColour(GRF__LINE), w );
+      for( i = 0; i < n; i++ ) {
+         fprintf( svg_fp, "%.1f,%.1f ", SvgX(x[i]), SvgY(y[i]) );
+      }
+      fprintf( svg_fp, "\"/>\n" );
    }
    return 1;
 }
@@ -247,6 +342,14 @@ int astGLine( int n, const float *x, const float *y ) {
 int astGMark( int n, const float *x, const float *y, int type ) {
    if( log_fp && n > 0 && x && y ) {
       fprintf( log_fp, "GMark type=%d at=(%.3f,%.3f)\n", type, x[0], y[0] );
+   }
+   if( svg_fp && n > 0 && x && y ) {
+      int i;
+      for( i = 0; i < n; i++ ) {
+         fprintf( svg_fp, "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"2\" "
+                  "fill=\"%s\"/>\n", SvgX(x[i]), SvgY(y[i]),
+                  SvgColour(GRF__MARK) );
+      }
    }
    return 1;
 }
