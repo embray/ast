@@ -62,6 +62,7 @@ jobs:
           -DBUILD_SHARED_LIBS=${{ matrix.shared_libs }}
           -DAST_BUILD_FORTRAN=${{ matrix.fortran }}
           -DAST_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+          -DAST_C_STANDARD=11
 
       - name: Build
         run: cmake --build build --parallel

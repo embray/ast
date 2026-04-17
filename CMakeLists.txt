@@ -37,6 +37,15 @@ option(AST_ENABLE_HUGE_TEST "Build the huge manual stress test converted from te
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
 
+# Pick the C standard libast is built against.  The legacy Starlink build
+# declared C99; C11 is source-compatible (no removed APIs, no keyword
+# collisions) and has the advantage that `DBL_DECIMAL_DIG` is visible on
+# glibc under strict ISO mode, which keeps the number of digits used in
+# AST's serialized output (`AST__DBL_DIG`) consistent across macOS and
+# Linux.  Default stays "99" until the project broadly adopts C11.
+set(AST_C_STANDARD "99" CACHE STRING "C standard for libast (99 or 11)")
+set_property(CACHE AST_C_STANDARD PROPERTY STRINGS "99" "11")
+
 # ============================================================
 # Developer build options
 # ============================================================
@@ -736,7 +745,7 @@ set_target_properties(ast PROPERTIES
     VERSION "${PROJECT_VERSION}"
     SOVERSION "${PROJECT_VERSION_MAJOR}"
     POSITION_INDEPENDENT_CODE ON
-    C_STANDARD 99
+    C_STANDARD ${AST_C_STANDARD}
 )
 ast_apply_dev_options(ast)
 
