@@ -803,6 +803,12 @@ if(PKG_CONFIG_FOUND)
 endif()
 
 if(PLPLOT_FOUND)
+    message(STATUS "Found PLplot: ${PLPLOT_LIBRARIES}")
+else()
+    message(STATUS "PLplot not found - building without PLplot support")
+endif()
+
+if(PLPLOT_FOUND)
     add_library(ast_grf_plplot STATIC src/grf_plplot.c)
     target_include_directories(ast_grf_plplot PRIVATE ${SATELLITE_INCLUDES} ${PLPLOT_INCLUDE_DIRS})
     target_compile_definitions(ast_grf_plplot PRIVATE HAVE_CONFIG_H)
