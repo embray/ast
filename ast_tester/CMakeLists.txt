@@ -4,6 +4,15 @@
 # been converted to C.  All tests use CTest and do not require any
 # Starlink infrastructure.
 
+# Ensure test executables find the locally-built libast before any
+# system-installed version (e.g. from a conda environment whose lib
+# directory may be injected into RPATH by the compiler toolchain via
+# $LDFLAGS, and the --disable-new-dtags flag forces RPATH which is
+# searched before LD_LIBRARY_PATH).  Prepending -rpath for the build
+# directory puts it first in the RPATH list.
+set(CMAKE_EXE_LINKER_FLAGS
+    "-Wl,-rpath,${CMAKE_BINARY_DIR} ${CMAKE_EXE_LINKER_FLAGS}")
+
 # Common include directories for all tests
 set(TEST_INCLUDES
     "${CMAKE_CURRENT_SOURCE_DIR}/.."          # top-level (pal2ast.h etc.)
