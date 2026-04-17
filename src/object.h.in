@@ -327,6 +327,11 @@
 *        Added astHasAttribute.
 *     20-SEP-2018 (DSB):
 *        Added AST__DBL_WIDTH and AST__FLT_WIDTH
+*     16-APR-2026 (DSB):
+*        Raise the near-zero floor in astEQUALS from DBL_MIN to 1.0e-12
+*        so the helper reports equality for pairs of values of order
+*        DBL_EPSILON (for example, the ulp-scale inverse-matrix residuals
+*        that drift between macOS and Linux math libraries).
 */
 
 /* Include files. */
@@ -1428,8 +1433,16 @@ int astTest##attribute##_( Ast##class *this, int *status ) { \
 
 /* Check for equality of floating point values. We cannot compare bad values
    directly because of the danger of floating point exceptions, so bad
-   values are dealt with explicitly. */
-#define astEQUALS(aa,bb,tol) (((aa)==AST__BAD)?(((bb)==AST__BAD)?1:0):(((bb)==AST__BAD)?0:(fabs((aa)-(bb))<=(tol)*astMAX((fabs(aa)+fabs(bb))*DBL_EPSILON,DBL_MIN))))
+   values are dealt with explicitly. The comparison combines a relative
+   tolerance (suitable for values that are not close to zero) with an
+   absolute floor of 1.0e-12 so that near-zero values, where the relative
+   formula degenerates to DBL_EPSILON * near-zero ~ 1e-32, still compare
+   equal under realistic arithmetic noise (for example, off-diagonal
+   residuals in the inverse of a well-conditioned matrix). The original
+   DBL_MIN floor was effectively no floor at all; this was insufficient
+   when the relative comparison was applied to values of order
+   DBL_EPSILON itself. */
+#define astEQUALS(aa,bb,tol) (((aa)==AST__BAD)?(((bb)==AST__BAD)?1:0):(((bb)==AST__BAD)?0:(fabs((aa)-(bb))<=astMAX((tol)*(fabs(aa)+fabs(bb))*DBL_EPSILON,1.0E-12))))
 #define astEQUAL(aa,bb) astEQUALS(aa,bb,1.0E5)
 
 
