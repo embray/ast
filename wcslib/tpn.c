@@ -32,10 +32,8 @@
 *                      (with no polynomial correction). Otherwise, set to 1.0.
 *===========================================================================*/
 
-int astTPNset(prj)
-
-struct AstPrjPrm *prj;
-
+int
+astTPNset(struct AstPrjPrm * prj)
 {
    int m;
 
@@ -72,12 +70,8 @@ struct AstPrjPrm *prj;
 
 /*--------------------------------------------------------------------------*/
 
-int astTPNfwd(phi, theta, prj, xx, yy)
-
-const double phi, theta;
-double *xx, *yy;
-struct AstPrjPrm *prj;
-
+int
+astTPNfwd(const double phi, const double theta, struct AstPrjPrm * prj, double * xx, double * yy)
 {
    double r, xi, eta, x2, xy, y2, r2, x3, x2y, xy2, y3, r3, x4, x3y,
           x2y2, xy3, y4, x5, x4y, x3y2, x2y3, xy4, y5, r5, x6, x5y, x4y2,
@@ -280,12 +274,8 @@ struct AstPrjPrm *prj;
 
 /*--------------------------------------------------------------------------*/
 
-int astTPNrev(x, y, prj, phi, theta)
-
-const double x, y;
-double *phi, *theta;
-struct AstPrjPrm *prj;
-
+int
+astTPNrev(const double x, const double y, struct AstPrjPrm * prj, double * phi, double * theta)
 {
    double r, xi, eta, x2, xy, y2, r2, x3, x2y, xy2, y3, r3, x4, x3y,
           x2y2, xy3, y4, x5, x4y, x3y2, x2y3, xy4, y5, r5, x6, x5y, x4y2,
