@@ -68,6 +68,34 @@ function(ast_add_test name)
     endif()
 endfunction()
 
+# Read a pipe-delimited text file into a list of encoded records.
+# Skips blank lines and lines starting with #.
+# Each element of <out_var> is a pipe-separated string of stripped fields.
+function(ast_read_test_data file out_var nfields)
+    file(STRINGS "${file}" _raw_lines)
+    set(_result)
+    foreach(_line IN LISTS _raw_lines)
+        string(STRIP "${_line}" _line)
+        if(_line STREQUAL "" OR _line MATCHES "^#")
+            continue()
+        endif()
+        string(REPLACE "|" ";" _fields "${_line}")
+        list(LENGTH _fields _nf)
+        if(NOT _nf EQUAL ${nfields})
+            message(FATAL_ERROR
+                "${file}: expected ${nfields} fields, got ${_nf} in: ${_line}")
+        endif()
+        set(_stripped)
+        foreach(_f IN LISTS _fields)
+            string(STRIP "${_f}" _f)
+            list(APPEND _stripped "${_f}")
+        endforeach()
+        string(REPLACE ";" "|" _encoded "${_stripped}")
+        list(APPEND _result "${_encoded}")
+    endforeach()
+    set(${out_var} "${_result}" PARENT_SCOPE)
+endfunction()
+
 # --- Tests using public API only ---
 ast_add_test(testerror)
 ast_add_test(testobject)
@@ -220,217 +248,30 @@ function(add_wcsconv_test)
     endif()
 endfunction()
 
-add_wcsconv_test(NAME timj_fits-wcs
-                 INPUT timj.ast
-                 REFERENCE timj.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,FitsDigits=8")
-
-add_wcsconv_test(NAME timj_fits-iraf
-                 INPUT timj.ast
-                 REFERENCE timj.fits-iraf
-                 ENCODING fits-iraf
-                 ATTRS "FitsDigits=8")
-
-add_wcsconv_test(NAME timj_fits-aips
-                 INPUT timj.ast
-                 REFERENCE timj.fits-aips
-                 ENCODING fits-aips
-                 ATTRS "FitsDigits=8")
-
-add_wcsconv_test(NAME timj_fits-pc
-                 INPUT timj.ast
-                 REFERENCE timj.fits-pc
-                 ENCODING fits-pc
-                 ATTRS "fitsrounding=0,FitsDigits=8")
-
-add_wcsconv_test(NAME timj_native
-                 INPUT timj.ast
-                 REFERENCE timj.native
-                 ENCODING native
-                 ATTRS "FitsDigits=8"
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME a20070718_fits-wcs
-                 INPUT a20070718_00010_02_cube.ast
-                 REFERENCE a20070718_00010_02_cube.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "FitsDigits=8")
-
-add_wcsconv_test(NAME dss_fits-dss_ast
-                 INPUT dss.fits-dss
-                 REFERENCE dss.ast
-                 ENCODING ast
-                 ATTRS "FitsDigits=8")
-
-add_wcsconv_test(NAME dss_ast_dss
-                 INPUT dss.ast
-                 REFERENCE dss.dss
-                 ENCODING dss
-                 ATTRS "FitsDigits=8")
-
-add_wcsconv_test(NAME dss_ast_fits-wcs
-                 INPUT dss.ast
-                 REFERENCE dss.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,FitsDigits=8")
-
-add_wcsconv_test(NAME degen1_fits-wcs
-                 INPUT degen1.ast
-                 REFERENCE degen1.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,FitsDigits=8")
-
-add_wcsconv_test(NAME sip_fits-wcs
-                 INPUT sip.head
-                 REFERENCE sip.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,sipreplace=0,FitsDigits=8")
-
-add_wcsconv_test(NAME sip2_fits-wcs
-                 INPUT sip2.head
-                 REFERENCE sip2.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,sipreplace=0,FitsDigits=8")
-
-add_wcsconv_test(NAME lsst_fits-wcs
-                 INPUT lsst.ast
-                 REFERENCE lsst.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,FitsDigits=8")
-
-add_wcsconv_test(NAME longslit_fits-wcs
-                 INPUT longslit.fits-pc
-                 REFERENCE longslit.fits-wcs
-                 ENCODING fits-wcs
-                 ATTRS "cdmatrix=1,FitsDigits=8")
-
-# --- .head file native-encoding round-trip tests ---
-# These test FitsChan→FrameSet→Channel round-trips for .head files not
-# previously covered by wcsconverter.  SKIP_STRING_COMPARE is used because
-# native encoding output may vary at the ulp level between platforms.
-add_wcsconv_test(NAME aitoff_native
-                 INPUT aitoff.head
-                 REFERENCE aitoff.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car1_native
-                 INPUT car1.head
-                 REFERENCE car1.native
-                 ENCODING native
-                 ATTRS "carlin=1"
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car2_native
-                 INPUT car2.head
-                 REFERENCE car2.native
-                 ENCODING native
-                 ATTRS "carlin=1"
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car3_native
-                 INPUT car3.head
-                 REFERENCE car3.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car4_native
-                 INPUT car4.head
-                 REFERENCE car4.native
-                 ENCODING native
-                 ATTRS "carlin=1"
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car5_native
-                 INPUT car5.head
-                 REFERENCE car5.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME car6_native
-                 INPUT car6.head
-                 REFERENCE car6.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME cobe_native
-                 INPUT cobe.head
-                 REFERENCE cobe.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME hpx_native
-                 INPUT hpx.head
-                 REFERENCE hpx.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME origin_native
-                 INPUT origin.head
-                 REFERENCE origin.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME polco_native
-                 INPUT polco.head
-                 REFERENCE polco.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME polco2_native
-                 INPUT polco2.head
-                 REFERENCE polco2.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME scp_native
-                 INPUT scp.head
-                 REFERENCE scp.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME serpens_native
-                 INPUT serpens.head
-                 REFERENCE serpens.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME specflux_native
-                 INPUT specflux.head
-                 REFERENCE specflux.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME timeplot_native
-                 INPUT timeplot.head
-                 REFERENCE timeplot.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME tnx_native
-                 INPUT tnx.head
-                 REFERENCE tnx.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME tsc_native
-                 INPUT tsc.head
-                 REFERENCE tsc.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME zpn_native
-                 INPUT zpn.head
-                 REFERENCE zpn.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
-
-add_wcsconv_test(NAME zpx_native
-                 INPUT zpx.head
-                 REFERENCE zpx.native
-                 ENCODING native
-                 SKIP_STRING_COMPARE)
+ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/wcsconv_tests.txt" _wcsconv_tests 6)
+foreach(_entry IN LISTS _wcsconv_tests)
+    string(REPLACE "|" ";" _fields "${_entry}")
+    list(GET _fields 0 _name)
+    list(GET _fields 1 _input)
+    list(GET _fields 2 _reference)
+    list(GET _fields 3 _encoding)
+    list(GET _fields 4 _attrs)
+    list(GET _fields 5 _skip)
+    set(_skip_flag "")
+    if(_skip STREQUAL "yes")
+        set(_skip_flag "SKIP_STRING_COMPARE")
+    endif()
+    set(_attrs_arg "")
+    if(NOT _attrs STREQUAL "")
+        set(_attrs_arg "ATTRS" "${_attrs}")
+    endif()
+    add_wcsconv_test(NAME ${_name}
+                     INPUT ${_input}
+                     REFERENCE ${_reference}
+                     ENCODING ${_encoding}
+                     ${_attrs_arg}
+                     ${_skip_flag})
+endforeach()
 
 # --- simplify: regression-diff harness ported from simplify.f ---
 # Reads a Mapping from an AST dump, simplifies it, and diffs the result
@@ -501,18 +342,22 @@ function(add_simplify_test)
     endif()
 endfunction()
 
-add_simplify_test(NAME brad
-                  INPUT brad.map
-                  REFERENCE brad.simp)
-
-add_simplify_test(NAME lsst1
-                  INPUT lsst1.map
-                  REFERENCE lsst1.simp)
-
-add_simplify_test(NAME rigby
-                  INPUT rigby.map
-                  REFERENCE rigby.simp
-                  SKIP_STRING_COMPARE)
+ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/simplify_tests.txt" _simplify_tests 4)
+foreach(_entry IN LISTS _simplify_tests)
+    string(REPLACE "|" ";" _fields "${_entry}")
+    list(GET _fields 0 _name)
+    list(GET _fields 1 _input)
+    list(GET _fields 2 _reference)
+    list(GET _fields 3 _skip)
+    set(_skip_flag "")
+    if(_skip STREQUAL "yes")
+        set(_skip_flag "SKIP_STRING_COMPARE")
+    endif()
+    add_simplify_test(NAME ${_name}
+                      INPUT ${_input}
+                      REFERENCE ${_reference}
+                      ${_skip_flag})
+endforeach()
 
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
@@ -577,105 +422,26 @@ function(add_grid_test)
     endif()
 endfunction()
 
-add_grid_test(NAME aitoff
-              HEAD aitoff.head
-              ATTR "Grid=1,tickall=0,border=1,tol=0.001"
-              BOX "10.0 -10.0 300.0 280.0")
-
-add_grid_test(NAME car1
-              HEAD car1.head
-              ATTR "numlabgap=0.05"
-              FATTR "carlin=1"
-              BOX "0 0 2962 562")
-
-add_grid_test(NAME car2
-              HEAD car2.head
-              ATTR "numlabgap(2)=0.05,labelling=interior"
-              FATTR "carlin=1"
-              BOX "0 0 2962 562")
-
-add_grid_test(NAME car3
-              HEAD car3.head
-              ATTR "grid=1"
-              BOX "0 0 400 400")
-
-add_grid_test(NAME car4
-              HEAD car4.head
-              ATTR "format(1)=gd,format(2)=gd,Grid=1,tickall=0,width(axes)=3"
-              FATTR "carlin=1"
-              BOX "0 0 951 1851")
-
-add_grid_test(NAME car5
-              HEAD car5.head
-              ATTR "border=1"
-              BOX "0 0 951 1851")
-
-add_grid_test(NAME car6
-              HEAD car6.head
-              ATTR "format(1)=ghms,format(2)=gdm,edge(2)=r,tickall=0,grid=1"
-              BOX "0 0 5401 1741")
-
-add_grid_test(NAME cobe
-              HEAD cobe.head
-              ATTR "Grid=0,labelling=exterior,gap(1)=50"
-              BOX "10.0 -10.0 300.0 280.0")
-
-add_grid_test(NAME hpx
-              HEAD hpx.head
-              ATTR "Grid=1,labelling=interior,bottom(1)=0"
-              BOX "0.5 0.5 300.5 200.5")
-
-add_grid_test(NAME origin
-              HEAD origin.head
-              ATTR "Grid=1,labelling=int"
-              BOX "0 0 500 500")
-
-add_grid_test(NAME polco
-              HEAD polco.head
-              ATTR "border=1"
-              BOX "-300 -300 500 500")
-
-add_grid_test(NAME polco2
-              HEAD polco2.head
-              BOX "-300 -300 500 500")
-
-add_grid_test(NAME scp
-              HEAD scp.head
-              ATTR "border=1"
-              BOX "1.0 1.0 1500.0 1300.0")
-
-add_grid_test(NAME serpens
-              HEAD serpens.head
-              BOX "0.5 0.5 150.5 120.5")
-
-add_grid_test(NAME specflux
-              HEAD specflux.head
-              ATTR "system=freq,logplot=1,loggap(1)=100"
-              BOX "1 3 1.0E-8 9")
-
-add_grid_test(NAME timeplot
-              HEAD timeplot.head
-              ATTR "minticklen=0.02,majticklen=0.05,gap(2)=0.1,NumLabGap=0.05,textlabgap=0.1,size=0.9"
-              BOX "0.046 3.0 1.008 3.3")
-
-add_grid_test(NAME tnx
-              HEAD tnx.head
-              ATTR "Grid=1,textlabgap=0.1,border=0"
-              BOX "0.0 0.0 2048.0 4096.0")
-
-add_grid_test(NAME tsc
-              HEAD tsc.head
-              ATTR "border=1"
-              BOX "1 1 1600 1600")
-
-add_grid_test(NAME zpn
-              HEAD zpn.head
-              ATTR "tol=0.0001"
-              BOX "1 1 200.0 200.0")
-
-add_grid_test(NAME zpx
-              HEAD zpx.head
-              ATTR "Grid=1,style(grid1)=2,size(textlab2)=2")
+ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _grid_tests 5)
+foreach(_entry IN LISTS _grid_tests)
+    string(REPLACE "|" ";" _fields "${_entry}")
+    list(GET _fields 0 _name)
+    list(GET _fields 1 _head)
+    list(GET _fields 2 _attr)
+    list(GET _fields 3 _fattr)
+    list(GET _fields 4 _box)
+    set(_args "NAME" "${_name}" "HEAD" "${_head}")
+    if(NOT _attr STREQUAL "")
+        list(APPEND _args "ATTR" "${_attr}")
+    endif()
+    if(NOT _fattr STREQUAL "")
+        list(APPEND _args "FATTR" "${_fattr}")
+    endif()
+    if(NOT _box STREQUAL "")
+        list(APPEND _args "BOX" "${_box}")
+    endif()
+    add_grid_test(${_args})
+endforeach()
 
 if(PLPLOT_FOUND)
     configure_file(lsst.fits-wcs "${CMAKE_CURRENT_BINARY_DIR}/lsst.fits-wcs" COPYONLY)
@@ -739,104 +505,25 @@ if(PLPLOT_FOUND)
         endif()
     endfunction()
 
-    add_plotter_test(NAME aitoff
-                     HEAD aitoff.head
-                     ATTR "Grid=1,tickall=0,border=1,tol=0.001"
-                     BOX "10.0 -10.0 300.0 280.0")
-
-    add_plotter_test(NAME car1
-                     HEAD car1.head
-                     ATTR "numlabgap=0.05"
-                     FATTR "carlin=1"
-                     BOX "0 0 2962 562")
-
-    add_plotter_test(NAME car2
-                     HEAD car2.head
-                     ATTR "numlabgap(2)=0.05,labelling=interior"
-                     FATTR "carlin=1"
-                     BOX "0 0 2962 562")
-
-    add_plotter_test(NAME car3
-                     HEAD car3.head
-                     ATTR "grid=1"
-                     BOX "0 0 400 400")
-
-    add_plotter_test(NAME car4
-                     HEAD car4.head
-                     ATTR "format(1)=gd,format(2)=gd,Grid=1,tickall=0,width(axes)=3"
-                     FATTR "carlin=1"
-                     BOX "0 0 951 1851")
-
-    add_plotter_test(NAME car5
-                     HEAD car5.head
-                     ATTR "border=1"
-                     BOX "0 0 951 1851")
-
-    add_plotter_test(NAME car6
-                     HEAD car6.head
-                     ATTR "format(1)=ghms,format(2)=gdm,edge(2)=r,tickall=0,grid=1"
-                     BOX "0 0 5401 1741")
-
-    add_plotter_test(NAME cobe
-                     HEAD cobe.head
-                     ATTR "Grid=0,labelling=exterior,gap(1)=50"
-                     BOX "10.0 -10.0 300.0 280.0")
-
-    add_plotter_test(NAME hpx
-                     HEAD hpx.head
-                     ATTR "Grid=1,labelling=interior,bottom(1)=0"
-                     BOX "0.5 0.5 300.5 200.5")
-
-    add_plotter_test(NAME origin
-                     HEAD origin.head
-                     ATTR "Grid=1,labelling=int"
-                     BOX "0 0 500 500")
-
-    add_plotter_test(NAME polco
-                     HEAD polco.head
-                     ATTR "border=1"
-                     BOX "-300 -300 500 500")
-
-    add_plotter_test(NAME polco2
-                     HEAD polco2.head
-                     BOX "-300 -300 500 500")
-
-    add_plotter_test(NAME scp
-                     HEAD scp.head
-                     ATTR "border=1"
-                     BOX "1.0 1.0 1500.0 1300.0")
-
-    add_plotter_test(NAME serpens
-                     HEAD serpens.head
-                     BOX "0.5 0.5 150.5 120.5")
-
-    add_plotter_test(NAME specflux
-                     HEAD specflux.head
-                     ATTR "system=freq,logplot=1,loggap(1)=100"
-                     BOX "1 3 1.0E-8 9")
-
-    add_plotter_test(NAME timeplot
-                     HEAD timeplot.head
-                     ATTR "minticklen=0.02,majticklen=0.05,gap(2)=0.1,NumLabGap=0.05,textlabgap=0.1,size=0.9"
-                     BOX "0.046 3.0 1.008 3.3")
-
-    add_plotter_test(NAME tnx
-                     HEAD tnx.head
-                     ATTR "Grid=1,textlabgap=0.1,border=0"
-                     BOX "0.0 0.0 2048.0 4096.0")
-
-    add_plotter_test(NAME tsc
-                     HEAD tsc.head
-                     ATTR "border=1"
-                     BOX "1 1 1600 1600")
-
-    add_plotter_test(NAME zpn
-                     HEAD zpn.head
-                     ATTR "tol=0.0001"
-                     BOX "1 1 200.0 200.0")
-
-    add_plotter_test(NAME zpx
-                     HEAD zpx.head
-                     ATTR "Grid=1,style(grid1)=2,size(textlab2)=2")
+    ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _plotter_tests 5)
+    foreach(_entry IN LISTS _plotter_tests)
+        string(REPLACE "|" ";" _fields "${_entry}")
+        list(GET _fields 0 _name)
+        list(GET _fields 1 _head)
+        list(GET _fields 2 _attr)
+        list(GET _fields 3 _fattr)
+        list(GET _fields 4 _box)
+        set(_args "NAME" "${_name}" "HEAD" "${_head}")
+        if(NOT _attr STREQUAL "")
+            list(APPEND _args "ATTR" "${_attr}")
+        endif()
+        if(NOT _fattr STREQUAL "")
+            list(APPEND _args "FATTR" "${_fattr}")
+        endif()
+        if(NOT _box STREQUAL "")
+            list(APPEND _args "BOX" "${_box}")
+        endif()
+        add_plotter_test(${_args})
+    endforeach()
 
 endif()
