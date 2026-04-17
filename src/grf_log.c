@@ -310,8 +310,10 @@ int astGText( const char *text, float x, float y, const char *just,
                "fill=\"%s\" text-anchor=\"%s\" dominant-baseline=\"%s\"",
                sx, sy, fs, SvgColour(GRF__TEXT), anchor, baseline );
       if( fabs(angle) > 0.01 ) {
-         fprintf( svg_fp, " transform=\"rotate(%.0f,%d,%d)\"",
-                  angle, sx, sy );
+         int iangle = (int)( angle / 5.0 ) * 5;
+         if( angle < 0 && iangle != (int)angle ) iangle -= 5;
+         fprintf( svg_fp, " transform=\"rotate(%d,%d,%d)\"",
+                  iangle, sx, sy );
       }
       fprintf( svg_fp, ">%s</text>\n", text );
    }

@@ -88,16 +88,16 @@
 <polyline fill="none" stroke="#ff0000" stroke-width="1" points="534,270 535,267 536,263 538,260 539,257 541,253 542,250 544,247 545,243 547,240 548,237 550,234 551,231 553,227 555,224 "/>
 <polyline fill="none" stroke="#ff0000" stroke-width="1" points="555,224 557,222 558,219 560,216 562,213 565,211 567,208 569,205 573,203 578,201 582,198 586,196 590,194 595,191 599,189 "/>
 <polyline fill="none" stroke="#ff0000" stroke-width="1" points="599,189 603,187 607,184 611,182 614,180 618,178 622,176 626,174 630,173 634,171 638,170 642,169 646,168 648,168 "/>
-<text x="421" y="244" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-11,421,244)">180</text>
-<text x="77" y="301" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(11,77,301)">0</text>
-<text x="645" y="301" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-11,645,301)">60</text>
-<text x="587" y="289" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-19,587,289)">90</text>
-<text x="532" y="273" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-23,532,273)">120</text>
+<text x="421" y="244" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-15,421,244)">180</text>
+<text x="77" y="301" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(10,77,301)">0</text>
+<text x="645" y="301" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-10,645,301)">60</text>
+<text x="587" y="289" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-20,587,289)">90</text>
+<text x="532" y="273" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-25,532,273)">120</text>
 <text x="478" y="256" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="hanging" transform="rotate(-20,478,256)">150</text>
-<text x="410" y="369" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(-0,410,369)">-90</text>
-<text x="465" y="349" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(37,465,349)">-60</text>
+<text x="410" y="369" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(0,410,369)">-90</text>
+<text x="465" y="349" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(35,465,349)">-60</text>
 <text x="509" y="315" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(65,509,315)">-30</text>
-<text x="551" y="223" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(66,551,223)">30</text>
-<text x="596" y="187" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(37,596,187)">60</text>
+<text x="551" y="223" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(65,551,223)">30</text>
+<text x="596" y="187" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic" transform="rotate(35,596,187)">60</text>
 <text x="360" y="137" font-family="sans-serif" font-size="14" fill="#ff0000" text-anchor="middle" dominant-baseline="alphabetic">A FITS test</text>
 </svg>
