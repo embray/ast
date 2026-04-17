@@ -124,12 +124,12 @@ void astGrfLogClose( void ) {
 }
 
 /* SVG helpers. */
-static float SvgX( float wx ) {
-   return wx * (float)svg_w;
+static int SvgX( float wx ) {
+   return (int)( wx * (float)svg_w + 0.5f );
 }
 
-static float SvgY( float wy ) {
-   return (float)svg_h - wy * (float)svg_h;
+static int SvgY( float wy ) {
+   return (int)( (float)svg_h - wy * (float)svg_h + 0.5f );
 }
 
 static const char *SvgColour( int prim ) {
@@ -138,10 +138,10 @@ static const char *SvgColour( int prim ) {
    return cmap0[idx];
 }
 
-static float SvgFontSize( void ) {
+static int SvgFontSize( void ) {
    double scale = attr_size[GRF__TEXT];
    if( scale <= 0.0 ) scale = 1.0;
-   return (float)( 14.0 * scale );
+   return (int)( 14.0 * scale + 0.5 );
 }
 
 /* Helper: current character height in mm, accounting for size scaling. */
@@ -285,9 +285,9 @@ int astGText( const char *text, float x, float y, const char *just,
                upx, upy );
    }
    if( svg_fp && text && text[0] != '\0' ) {
-      float sx = SvgX( x );
-      float sy = SvgY( y );
-      float fs = SvgFontSize();
+      int sx = SvgX( x );
+      int sy = SvgY( y );
+      int fs = SvgFontSize();
       double angle = -atan2( (double)upx, (double)upy ) * R2D;
 
       const char *anchor = "middle";
@@ -305,12 +305,12 @@ int astGText( const char *text, float x, float y, const char *just,
          }
       }
 
-      fprintf( svg_fp, "<text x=\"%.1f\" y=\"%.1f\" "
-               "font-family=\"sans-serif\" font-size=\"%.1f\" "
+      fprintf( svg_fp, "<text x=\"%d\" y=\"%d\" "
+               "font-family=\"sans-serif\" font-size=\"%d\" "
                "fill=\"%s\" text-anchor=\"%s\" dominant-baseline=\"%s\"",
                sx, sy, fs, SvgColour(GRF__TEXT), anchor, baseline );
       if( fabs(angle) > 0.01 ) {
-         fprintf( svg_fp, " transform=\"rotate(%.1f,%.1f,%.1f)\"",
+         fprintf( svg_fp, " transform=\"rotate(%.0f,%d,%d)\"",
                   angle, sx, sy );
       }
       fprintf( svg_fp, ">%s</text>\n", text );
@@ -330,9 +330,10 @@ int astGLine( int n, const float *x, const float *y ) {
       double w = attr_width[GRF__LINE];
       if( w < 1.0 ) w = 1.0;
       fprintf( svg_fp, "<polyline fill=\"none\" stroke=\"%s\" "
-               "stroke-width=\"%.1f\" points=\"", SvgColour(GRF__LINE), w );
+               "stroke-width=\"%d\" points=\"", SvgColour(GRF__LINE),
+               (int)(w + 0.5) );
       for( i = 0; i < n; i++ ) {
-         fprintf( svg_fp, "%.1f,%.1f ", SvgX(x[i]), SvgY(y[i]) );
+         fprintf( svg_fp, "%d,%d ", SvgX(x[i]), SvgY(y[i]) );
       }
       fprintf( svg_fp, "\"/>\n" );
    }
@@ -346,7 +347,7 @@ int astGMark( int n, const float *x, const float *y, int type ) {
    if( svg_fp && n > 0 && x && y ) {
       int i;
       for( i = 0; i < n; i++ ) {
-         fprintf( svg_fp, "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"2\" "
+         fprintf( svg_fp, "<circle cx=\"%d\" cy=\"%d\" r=\"2\" "
                   "fill=\"%s\"/>\n", SvgX(x[i]), SvgY(y[i]),
                   SvgColour(GRF__MARK) );
       }

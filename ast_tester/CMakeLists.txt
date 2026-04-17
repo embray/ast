@@ -385,7 +385,7 @@ ast_add_test(testgrid
 target_include_directories(testgrid PRIVATE "${CMAKE_SOURCE_DIR}/src")
 
 function(add_grid_test)
-    cmake_parse_arguments(P "SKIP_STRING_COMPARE"
+    cmake_parse_arguments(P ""
         "NAME;HEAD;ATTR;FATTR;BOX;REFERENCE"
         ""
         ${ARGN})
@@ -408,7 +408,7 @@ function(add_grid_test)
     endif()
 
     set(_ref_arg "")
-    if(P_REFERENCE AND NOT P_SKIP_STRING_COMPARE)
+    if(P_REFERENCE)
         configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${P_REFERENCE}"
                        "${CMAKE_CURRENT_BINARY_DIR}/${P_REFERENCE}" COPYONLY)
         set(_ref_arg "-DREF_FILE=${P_REFERENCE}")
@@ -420,7 +420,7 @@ function(add_grid_test)
             -DHEAD_FILE=${P_HEAD}
             "-DATTR=${P_ATTR}"
             "-DFATTR=${P_FATTR}"
-            -DOUT_FILE=grid_${P_NAME}.log
+            -DOUT_FILE=grid_${P_NAME}.svg
             "${_ref_arg}"
             "-DBOX=${_box_arg}"
             -P "${CMAKE_SOURCE_DIR}/cmake/run_grid_test.cmake"
@@ -431,7 +431,7 @@ function(add_grid_test)
     endif()
 endfunction()
 
-ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _grid_tests 7)
+ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _grid_tests 6)
 foreach(_entry IN LISTS _grid_tests)
     string(REPLACE "|" ";" _fields "${_entry}")
     list(GET _fields 0 _name)
@@ -440,7 +440,6 @@ foreach(_entry IN LISTS _grid_tests)
     list(GET _fields 3 _fattr)
     list(GET _fields 4 _box)
     list(GET _fields 5 _reference)
-    list(GET _fields 6 _skip_macos)
     set(_args "NAME" "${_name}" "HEAD" "${_head}")
     if(NOT _attr STREQUAL "")
         list(APPEND _args "ATTR" "${_attr}")
@@ -453,9 +452,6 @@ foreach(_entry IN LISTS _grid_tests)
     endif()
     if(NOT _reference STREQUAL "")
         list(APPEND _args "REFERENCE" "${_reference}")
-    endif()
-    if(_skip_macos STREQUAL "yes" AND APPLE)
-        list(APPEND _args "SKIP_STRING_COMPARE")
     endif()
     add_grid_test(${_args})
 endforeach()
@@ -522,7 +518,7 @@ if(PLPLOT_FOUND)
         endif()
     endfunction()
 
-    ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _plotter_tests 7)
+    ast_read_test_data("${CMAKE_CURRENT_SOURCE_DIR}/grid_tests.txt" _plotter_tests 6)
     foreach(_entry IN LISTS _plotter_tests)
         string(REPLACE "|" ";" _fields "${_entry}")
         list(GET _fields 0 _name)
