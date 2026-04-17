@@ -1,0 +1,19 @@
+GScales alpha=200.000 beta=200.000
+GScales alpha=200.000 beta=200.000
+GScales alpha=200.000 beta=200.000
+GQch chv=0.020000 chh=0.020000
+GScales alpha=200.000 beta=200.000
+GTxExt "Galactic longitude" x=0.217 y=0.542 just=BL box=(0.221,0.542)-(0.221,0.762)-(0.197,0.762)-(0.197,0.542)
+GText "Galactic longitude" x=0.213 y=0.542 just=BC up=(-1.000,0.000)
+GScales alpha=200.000 beta=200.000
+GTxExt "Galactic longitude" x=0.213 y=0.542 just=BC box=(0.217,0.432)-(0.217,0.652)-(0.193,0.652)-(0.193,0.432)
+GScales alpha=200.000 beta=200.000
+GTxExt "Galactic latitude" x=0.488 y=0.272 just=BL box=(0.488,0.268)-(0.696,0.268)-(0.696,0.292)-(0.488,0.292)
+GText "Galactic latitude" x=0.488 y=0.272 just=TC up=(0.000,1.000)
+GScales alpha=200.000 beta=200.000
+GTxExt "Galactic latitude" x=0.488 y=0.272 just=TC box=(0.384,0.248)-(0.592,0.248)-(0.592,0.272)-(0.384,0.272)
+GScales alpha=200.000 beta=200.000
+GTxExt "A FITS test" x=0.488 y=0.845 just=BL box=(0.488,0.841)-(0.624,0.841)-(0.624,0.865)-(0.488,0.865)
+GText "A FITS test" x=0.488 y=0.849 just=BC up=(0.000,1.000)
+GScales alpha=200.000 beta=200.000
+GTxExt "A FITS test" x=0.488 y=0.849 just=BC box=(0.420,0.845)-(0.556,0.845)-(0.556,0.869)-(0.420,0.869)

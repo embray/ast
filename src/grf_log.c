@@ -102,7 +102,7 @@ static double ChrHtMM( void ) {
 int astGScales( float *alpha, float *beta ) {
    *alpha = (float)( PAGE_WIDTH_MM  / ( WORLD_X_MAX - WORLD_X_MIN ) );
    *beta  = (float)( PAGE_HEIGHT_MM / ( WORLD_Y_MAX - WORLD_Y_MIN ) );
-   if( log_fp ) fprintf( log_fp, "GScales alpha=%.4f beta=%.4f\n",
+   if( log_fp ) fprintf( log_fp, "GScales alpha=%.3f beta=%.3f\n",
                           *alpha, *beta );
    return 1;
 }
@@ -210,8 +210,8 @@ int astGTxExt( const char *text, float x, float y, const char *just,
    }
 
    if( log_fp ) {
-      fprintf( log_fp, "GTxExt \"%s\" x=%.4f y=%.4f just=%c%c "
-               "box=(%.4f,%.4f)-(%.4f,%.4f)-(%.4f,%.4f)-(%.4f,%.4f)\n",
+      fprintf( log_fp, "GTxExt \"%s\" x=%.3f y=%.3f just=%c%c "
+               "box=(%.3f,%.3f)-(%.3f,%.3f)-(%.3f,%.3f)-(%.3f,%.3f)\n",
                text ? text : "", x, y,
                just ? just[0] : '?', just ? just[1] : '?',
                xb[0], yb[0], xb[1], yb[1],
@@ -223,8 +223,8 @@ int astGTxExt( const char *text, float x, float y, const char *just,
 int astGText( const char *text, float x, float y, const char *just,
               float upx, float upy ) {
    if( log_fp ) {
-      fprintf( log_fp, "GText \"%s\" x=%.4f y=%.4f just=%c%c "
-               "up=(%.4f,%.4f)\n",
+      fprintf( log_fp, "GText \"%s\" x=%.3f y=%.3f just=%c%c "
+               "up=(%.3f,%.3f)\n",
                text ? text : "", x, y,
                just ? just[0] : '?', just ? just[1] : '?',
                upx, upy );
@@ -233,24 +233,20 @@ int astGText( const char *text, float x, float y, const char *just,
 }
 
 int astGLine( int n, const float *x, const float *y ) {
-   if( log_fp ) {
-      fprintf( log_fp, "GLine n=%d", n );
-      if( n > 0 && x && y ) {
-         fprintf( log_fp, " from=(%.4f,%.4f)", x[0], y[0] );
-         if( n > 1 ) fprintf( log_fp, " to=(%.4f,%.4f)", x[n-1], y[n-1] );
+   if( log_fp && n > 1 && x && y ) {
+      /* Skip zero-length lines (from == to) — these are degenerate
+         tick marks whose presence varies between platforms. */
+      if( x[0] != x[n-1] || y[0] != y[n-1] ) {
+         fprintf( log_fp, "GLine from=(%.3f,%.3f) to=(%.3f,%.3f)\n",
+                  x[0], y[0], x[n-1], y[n-1] );
       }
-      fprintf( log_fp, "\n" );
    }
    return 1;
 }
 
 int astGMark( int n, const float *x, const float *y, int type ) {
-   if( log_fp ) {
-      fprintf( log_fp, "GMark n=%d type=%d", n, type );
-      if( n > 0 && x && y ) {
-         fprintf( log_fp, " at=(%.4f,%.4f)", x[0], y[0] );
-      }
-      fprintf( log_fp, "\n" );
+   if( log_fp && n > 0 && x && y ) {
+      fprintf( log_fp, "GMark type=%d at=(%.3f,%.3f)\n", type, x[0], y[0] );
    }
    return 1;
 }
