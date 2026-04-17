@@ -449,8 +449,16 @@ ast_apply_dev_options(simplify)
 #   simplify_<NAME>_astequal -- astEqual-based semantic check between the
 #                               output and the reference (uses ast_astequal
 #                               with encoding "ast").
+#
+# Options:
+#   SKIP_STRING_COMPARE -- register the astEqual test only; do not
+#                          register the byte-level string-diff test.
+#                          Use for fixtures whose serialised output is
+#                          known to vary at the ulp level between
+#                          platforms' math libraries.
 function(add_simplify_test)
-    cmake_parse_arguments(S ""
+    cmake_parse_arguments(S
+        "SKIP_STRING_COMPARE"
         "NAME;INPUT;REFERENCE"
         ""
         ${ARGN})
@@ -463,17 +471,19 @@ function(add_simplify_test)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${S_REFERENCE}"
                    "${CMAKE_CURRENT_BINARY_DIR}/${S_REFERENCE}" COPYONLY)
 
-    add_test(NAME simplify_${S_NAME}
-        COMMAND ${CMAKE_COMMAND}
-            -DSIMPLIFY=$<TARGET_FILE:simplify>
-            -DIN_FILE=${S_INPUT}
-            -DREF_FILE=${S_REFERENCE}
-            -DOUT_FILE=${S_NAME}.out
-            -P "${CMAKE_SOURCE_DIR}/cmake/run_simplify_test.cmake"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    if(AST_ENABLE_SANITIZERS)
-        set_tests_properties(simplify_${S_NAME} PROPERTIES
-            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    if(NOT S_SKIP_STRING_COMPARE)
+        add_test(NAME simplify_${S_NAME}
+            COMMAND ${CMAKE_COMMAND}
+                -DSIMPLIFY=$<TARGET_FILE:simplify>
+                -DIN_FILE=${S_INPUT}
+                -DREF_FILE=${S_REFERENCE}
+                -DOUT_FILE=${S_NAME}.out
+                -P "${CMAKE_SOURCE_DIR}/cmake/run_simplify_test.cmake"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+        if(AST_ENABLE_SANITIZERS)
+            set_tests_properties(simplify_${S_NAME} PROPERTIES
+                ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+        endif()
     endif()
 
     add_test(NAME simplify_${S_NAME}_astequal
@@ -501,7 +511,8 @@ add_simplify_test(NAME lsst1
 
 add_simplify_test(NAME rigby
                   INPUT rigby.map
-                  REFERENCE rigby.simp)
+                  REFERENCE rigby.simp
+                  SKIP_STRING_COMPARE)
 
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
