@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 44 tests passing by default, plus 1 optional huge stress test
+## Current status: 59 tests passing by default, plus 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -23,9 +23,10 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 5: Channel-callback tests | **Complete** |
 | Phase 2 Batch 6: Huge/manual stress tests | **Complete** (1 test) |
 | Phase 2 Batch 7: Final large tests | **Complete** (2 tests) |
+| Phase 2 Batch 8: WCS-conversion regression harness | **Complete** (14 tests from wcsconverter.f) |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (44 default + 1 optional)
+### Test inventory (59 default + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -43,6 +44,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - Batch 5: testmocchan, testxmlchan, testtable, teststcschan, testfitschan
 - Batch 6: testregions, testrebinseq, testplotter (conditional on PLplot)
 - Batch 7: testrebin, teststc
+- Batch 8: 14 × wcsconv_* regression-diff tests driven by ported wcsconverter.c
 - Optional manual stress test: testhuge_c
 
 ## Phase 1 details (complete)
@@ -116,11 +118,25 @@ Key issues:
   safeGetC() wrapper and strcmpTrim() for Fortran trailing-space semantics.
   astTranN arrays use in[ncoord][npoint] layout (Fortran column-major order).
 
+- **wcsconverter.c**: C port of the Fortran regression-diff harness. Not a
+  self-validating test — it is a CLI (`wcsconverter <in> <encoding> <out>
+  [<attrs>]`) driven by `ast_tester/CMakeLists.txt`'s `add_wcsconv_test()`
+  helper, which registers one ctest per fixture that invokes the binary
+  and diffs its output against a committed reference file. Replaces the
+  16-row regression loop in the old `ast_tester` tcsh script (the two
+  duplicate rows there collapse to 14 unique fixtures). The `timj.native`
+  reference was regenerated during the port to absorb a 1-ulp noise-level
+  drift in a single MatrixMap inverse cell between the 2018-era
+  reference and current libast output.
+
 ## Phase 2 remaining work
 
 ### Unconverted Fortran tests
 - testplot3d.f (1357 lines) — Plot3D (requires PGPLOT; interactive/graphical
   test that cannot be fully converted without a graphics backend)
+- simplify.f (regression-diff harness) — equivalent to wcsconverter but for
+  Mapping simplification (`*.map` -> `*.simp` diffs). Following the
+  wcsconverter pattern would be a straightforward next conversion.
 
 ## Phase 3 details (complete)
 
@@ -157,4 +173,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 44 default tests, all passing.
+Shows 59 default tests, all passing.
