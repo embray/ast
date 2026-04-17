@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 59 tests passing by default, plus 1 optional huge stress test
+## Current status: 65 tests passing by default, plus 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -24,9 +24,10 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 6: Huge/manual stress tests | **Complete** (1 test) |
 | Phase 2 Batch 7: Final large tests | **Complete** (2 tests) |
 | Phase 2 Batch 8: WCS-conversion regression harness | **Complete** (14 tests from wcsconverter.f) |
+| Phase 2 Batch 9: Simplify regression harness | **Complete** (3 tests from simplify.f) |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (59 default + 1 optional)
+### Test inventory (65 default + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -35,7 +36,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (33 default + 1 optional):**
+**Fortran tests converted to C (39 default + 1 optional):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
@@ -45,6 +46,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - Batch 6: testregions, testrebinseq, testplotter (conditional on PLplot)
 - Batch 7: testrebin, teststc
 - Batch 8: 14 × wcsconv_* regression-diff tests driven by ported wcsconverter.c
+- Batch 9: 3 × simplify_* + 3 × simplify_*_astequal regression-diff tests driven by ported simplify.c
 - Optional manual stress test: testhuge_c
 
 ## Phase 1 details (complete)
@@ -129,14 +131,19 @@ Key issues:
   drift in a single MatrixMap inverse cell between the 2018-era
   reference and current libast output.
 
+- **simplify.c**: C port of the Fortran simplify harness. Like wcsconverter,
+  it is a CLI (`simplify <in> <out>`) driven by `ast_tester/CMakeLists.txt`'s
+  `add_simplify_test()` helper.  Each fixture reads a `.map` input, runs
+  `astSimplify`, and diffs the output against a committed `.simp` reference.
+  Both byte-level string diff and astEqual semantic comparison tests are
+  registered, matching the wcsconverter pattern.  Three fixtures: brad,
+  lsst1, rigby.
+
 ## Phase 2 remaining work
 
 ### Unconverted Fortran tests
 - testplot3d.f (1357 lines) — Plot3D (requires PGPLOT; interactive/graphical
   test that cannot be fully converted without a graphics backend)
-- simplify.f (regression-diff harness) — equivalent to wcsconverter but for
-  Mapping simplification (`*.map` -> `*.simp` diffs). Following the
-  wcsconverter pattern would be a straightforward next conversion.
 
 ## Phase 3 details (complete)
 
@@ -173,4 +180,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 59 default tests, all passing.
+Shows 65 default tests, all passing (minus pre-existing testresimp segfault).

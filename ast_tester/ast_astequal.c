@@ -1,20 +1,19 @@
 /*
- *  wcs_astequal: semantic equality check for two files produced or
- *  consumed by wcsconverter.  Both files must be in the same encoding.
+ *  ast_astequal: semantic equality check for two AST object files.
+ *  Both files must be in the same encoding.
  *
  *  Usage:
- *     wcs_astequal <file_a> <file_b> <encoding> [<attrs>]
+ *     ast_astequal <file_a> <file_b> <encoding> [<attrs>]
  *
- *  Reads both files as FrameSets (via astChannel for AST dumps, via
+ *  Reads both files as AST Objects (via astChannel for AST dumps, via
  *  astFitsChan for every other encoding) and exits 0 if astEqual
- *  reports the two FrameSets equivalent, 1 if not, 2 on any internal
+ *  reports the two Objects equivalent, 1 if not, 2 on any internal
  *  failure.
  *
- *  This complements the byte-level diff test driven by
- *  run_wcsconverter_test.cmake: ast_equal absorbs platform-specific
- *  serialisation and 1-ulp arithmetic drift that a textual comparison
- *  can trip over, while the string test still catches unintentional
- *  changes to AST's output format.
+ *  This complements byte-level diff tests: astEqual absorbs
+ *  platform-specific serialisation and 1-ulp arithmetic drift that a
+ *  textual comparison can trip over, while the string test still
+ *  catches unintentional changes to AST's output format.
  */
 
 #include "ast.h"
@@ -37,7 +36,7 @@ static AstObject *read_file( const char *path, const char *encoding,
       FILE *fp = fopen( path, "r" );
       char line[256];
       if( !fp ) {
-         fprintf( stderr, "wcs_astequal: cannot open '%s'\n", path );
+         fprintf( stderr, "ast_astequal: cannot open '%s'\n", path );
          astAnnul( fc );
          return NULL;
       }
@@ -63,7 +62,7 @@ int main( int argc, char *argv[] ) {
 
    if( argc < 4 ) {
       fprintf( stderr,
-               "Usage: wcs_astequal <file_a> <file_b> <encoding> "
+               "Usage: ast_astequal <file_a> <file_b> <encoding> "
                "[<attrs>]\n" );
       return 2;
    }
@@ -81,7 +80,7 @@ int main( int argc, char *argv[] ) {
 
    if( !a || !b || !astOK ) {
       fprintf( stderr,
-               "wcs_astequal: could not read one or both files "
+               "ast_astequal: could not read one or both files "
                "(%s, %s)\n", fa, fb );
       if( a ) astAnnul( a );
       if( b ) astAnnul( b );
@@ -91,7 +90,7 @@ int main( int argc, char *argv[] ) {
    int equal = astEqual( a, b );
    if( !equal ) {
       fprintf( stderr,
-               "wcs_astequal: astEqual returned 0 for %s vs %s\n",
+               "ast_astequal: astEqual returned 0 for %s vs %s\n",
                fa, fb );
    }
 

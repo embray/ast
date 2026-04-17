@@ -129,13 +129,13 @@ target_link_libraries(wcsconverter PRIVATE ${TEST_LIBS})
 target_compile_definitions(wcsconverter PRIVATE HAVE_CONFIG_H)
 ast_apply_dev_options(wcsconverter)
 
-# wcs_astequal: pair-wise semantic equivalence check for FrameSet files.
-# Used alongside the string diff for platform-robust verification.
-add_executable(wcs_astequal wcs_astequal.c)
-target_include_directories(wcs_astequal PRIVATE ${TEST_INCLUDES})
-target_link_libraries(wcs_astequal PRIVATE ${TEST_LIBS})
-target_compile_definitions(wcs_astequal PRIVATE HAVE_CONFIG_H)
-ast_apply_dev_options(wcs_astequal)
+# ast_astequal: semantic equivalence check for AST object files.
+# Used alongside string diffs for platform-robust verification.
+add_executable(ast_astequal ast_astequal.c)
+target_include_directories(ast_astequal PRIVATE ${TEST_INCLUDES})
+target_link_libraries(ast_astequal PRIVATE ${TEST_LIBS})
+target_compile_definitions(ast_astequal PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(ast_astequal)
 
 # Helper to register wcsconverter regression tests.
 # Each call copies the input + reference file into the build tree and
@@ -197,7 +197,7 @@ function(add_wcsconv_test)
     add_test(NAME wcsconv_${W_NAME}_astequal
         COMMAND ${CMAKE_COMMAND}
             -DWCSCONVERTER=$<TARGET_FILE:wcsconverter>
-            -DWCS_ASTEQUAL=$<TARGET_FILE:wcs_astequal>
+            -DAST_ASTEQUAL=$<TARGET_FILE:ast_astequal>
             -DIN_FILE=${W_INPUT}
             -DREF_FILE=${W_REFERENCE}
             -DOUT_FILE=${W_NAME}.astequal.out
@@ -295,6 +295,77 @@ add_wcsconv_test(NAME longslit_fits-wcs
                  REFERENCE longslit.fits-wcs
                  ENCODING fits-wcs
                  ATTRS "cdmatrix=1,FitsDigits=8")
+
+# --- simplify: regression-diff harness ported from simplify.f ---
+# Reads a Mapping from an AST dump, simplifies it, and diffs the result
+# against a committed reference file.  Same pattern as wcsconverter above.
+add_executable(simplify simplify.c)
+target_include_directories(simplify PRIVATE ${TEST_INCLUDES})
+target_link_libraries(simplify PRIVATE ${TEST_LIBS})
+target_compile_definitions(simplify PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(simplify)
+
+# Helper to register simplify regression tests.
+# Each call copies the input .map and reference .simp files into the build
+# tree and registers two ctest entries:
+#   simplify_<NAME>          -- byte-level diff of the produced output
+#                               against the committed reference.
+#   simplify_<NAME>_astequal -- astEqual-based semantic check between the
+#                               output and the reference (uses ast_astequal
+#                               with encoding "ast").
+function(add_simplify_test)
+    cmake_parse_arguments(S ""
+        "NAME;INPUT;REFERENCE"
+        ""
+        ${ARGN})
+    if(NOT S_NAME OR NOT S_INPUT OR NOT S_REFERENCE)
+        message(FATAL_ERROR
+            "add_simplify_test: NAME, INPUT, REFERENCE all required")
+    endif()
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${S_INPUT}"
+                   "${CMAKE_CURRENT_BINARY_DIR}/${S_INPUT}" COPYONLY)
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${S_REFERENCE}"
+                   "${CMAKE_CURRENT_BINARY_DIR}/${S_REFERENCE}" COPYONLY)
+
+    add_test(NAME simplify_${S_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DSIMPLIFY=$<TARGET_FILE:simplify>
+            -DIN_FILE=${S_INPUT}
+            -DREF_FILE=${S_REFERENCE}
+            -DOUT_FILE=${S_NAME}.out
+            -P "${CMAKE_SOURCE_DIR}/cmake/run_simplify_test.cmake"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    if(AST_ENABLE_SANITIZERS)
+        set_tests_properties(simplify_${S_NAME} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    endif()
+
+    add_test(NAME simplify_${S_NAME}_astequal
+        COMMAND ${CMAKE_COMMAND}
+            -DSIMPLIFY=$<TARGET_FILE:simplify>
+            -DAST_ASTEQUAL=$<TARGET_FILE:ast_astequal>
+            -DIN_FILE=${S_INPUT}
+            -DREF_FILE=${S_REFERENCE}
+            -DOUT_FILE=${S_NAME}.astequal.out
+            -P "${CMAKE_SOURCE_DIR}/cmake/run_simplify_astequal_test.cmake"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    if(AST_ENABLE_SANITIZERS)
+        set_tests_properties(simplify_${S_NAME}_astequal PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+    endif()
+endfunction()
+
+add_simplify_test(NAME brad
+                  INPUT brad.map
+                  REFERENCE brad.simp)
+
+add_simplify_test(NAME lsst1
+                  INPUT lsst1.map
+                  REFERENCE lsst1.simp)
+
+add_simplify_test(NAME rigby
+                  INPUT rigby.map
+                  REFERENCE rigby.simp)
 
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
