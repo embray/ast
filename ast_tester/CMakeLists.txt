@@ -170,6 +170,84 @@ add_wcsconv_test(NAME timj_fits-wcs
                  ENCODING fits-wcs
                  ATTRS "cdmatrix=1,FitsDigits=8")
 
+add_wcsconv_test(NAME timj_fits-iraf
+                 INPUT timj.ast
+                 REFERENCE timj.fits-iraf
+                 ENCODING fits-iraf
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME timj_fits-aips
+                 INPUT timj.ast
+                 REFERENCE timj.fits-aips
+                 ENCODING fits-aips
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME timj_fits-pc
+                 INPUT timj.ast
+                 REFERENCE timj.fits-pc
+                 ENCODING fits-pc
+                 ATTRS "fitsrounding=0,FitsDigits=8")
+
+add_wcsconv_test(NAME timj_native
+                 INPUT timj.ast
+                 REFERENCE timj.native
+                 ENCODING native
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME a20070718_fits-wcs
+                 INPUT a20070718_00010_02_cube.ast
+                 REFERENCE a20070718_00010_02_cube.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME dss_fits-dss_ast
+                 INPUT dss.fits-dss
+                 REFERENCE dss.ast
+                 ENCODING ast
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME dss_ast_dss
+                 INPUT dss.ast
+                 REFERENCE dss.dss
+                 ENCODING dss
+                 ATTRS "FitsDigits=8")
+
+add_wcsconv_test(NAME dss_ast_fits-wcs
+                 INPUT dss.ast
+                 REFERENCE dss.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,FitsDigits=8")
+
+add_wcsconv_test(NAME degen1_fits-wcs
+                 INPUT degen1.ast
+                 REFERENCE degen1.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,FitsDigits=8")
+
+add_wcsconv_test(NAME sip_fits-wcs
+                 INPUT sip.head
+                 REFERENCE sip.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,sipreplace=0,FitsDigits=8")
+
+add_wcsconv_test(NAME sip2_fits-wcs
+                 INPUT sip2.head
+                 REFERENCE sip2.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,sipreplace=0,FitsDigits=8")
+
+add_wcsconv_test(NAME lsst_fits-wcs
+                 INPUT lsst.ast
+                 REFERENCE lsst.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,FitsDigits=8")
+
+add_wcsconv_test(NAME longslit_fits-wcs
+                 INPUT longslit.fits-pc
+                 REFERENCE longslit.fits-wcs
+                 ENCODING fits-wcs
+                 ATTRS "cdmatrix=1,FitsDigits=8")
+
 if(AST_ENABLE_HUGE_TEST)
     ast_add_test(testhuge_c SOURCES testhuge.c)
 endif()
