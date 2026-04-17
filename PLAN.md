@@ -11,7 +11,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 1. Add the existing C tests to the CMake build
 2. Convert Fortran tests to C to eliminate the Fortran/Starlink dependency
 
-## Current status: 65 tests passing by default, plus 1 optional huge stress test
+## Current status: 85 default tests + 20 conditional (PLplot) + 1 optional huge stress test
 
 | Phase | Status |
 |-------|--------|
@@ -25,9 +25,11 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 | Phase 2 Batch 7: Final large tests | **Complete** (2 tests) |
 | Phase 2 Batch 8: WCS-conversion regression harness | **Complete** (14 tests from wcsconverter.f) |
 | Phase 2 Batch 9: Simplify regression harness | **Complete** (3 tests from simplify.f) |
+| Phase 2 Batch 10: Plotter smoke tests | **Complete** (20 tests, conditional on PLplot) |
+| Phase 2 Batch 11: .head native round-trip tests | **Complete** (20 wcsconv tests from .head files) |
 | Phase 3: CI integration | **Complete** (tests run via ctest) |
 
-### Test inventory (65 default + 1 optional)
+### Test inventory (85 default + 20 conditional PLplot + 1 optional)
 
 **Original test (1):**
 - ast_test — minimal installation check
@@ -36,7 +38,7 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - testerror, testobject, testconvert, testresimp, testaxis, testframe,
   testunitnorm, testsplinemap_c, testyamlchan (conditional), testthreads (conditional)
 
-**Fortran tests converted to C (39 default + 1 optional):**
+**Fortran tests converted to C (59 default + 20 conditional + 1 optional):**
 - Batch 1: testzoommap, testnormmap, testmapping, testskyframe, testcmpframe,
   testlutmap, testratemap, testchannel
 - Batch 2: testrate, testspecframe, testflux, testspecflux, testcmpmap, testpolymap
@@ -47,6 +49,10 @@ depending on Starlink libraries (EMS, CHR, PSX). The goal is to:
 - Batch 7: testrebin, teststc
 - Batch 8: 14 × wcsconv_* regression-diff tests driven by ported wcsconverter.c
 - Batch 9: 3 × simplify_* + 3 × simplify_*_astequal regression-diff tests driven by ported simplify.c
+- Batch 10: 20 × plotter_* smoke tests (conditional on PLplot) — run testplotter
+  on each .head file with .attr/.fattr/.box companions to verify astGrid doesn't crash
+- Batch 11: 20 × wcsconv_*_native_astequal tests — round-trip .head files through
+  wcsconverter in native encoding and verify semantic equivalence via ast_astequal
 - Optional manual stress test: testhuge_c
 
 ## Phase 1 details (complete)
@@ -139,11 +145,34 @@ Key issues:
   registered, matching the wcsconverter pattern.  Three fixtures: brad,
   lsst1, rigby.
 
+- **ast_astequal.c**: Generic semantic equivalence comparator (renamed from
+  wcs_astequal.c). Reads two AST object files and exits 0 if astEqual
+  reports them equivalent. Handles both AST dumps (via astChannel) and
+  FITS encodings (via astFitsChan). Used by both wcsconverter and simplify
+  test harnesses.
+
 ## Phase 2 remaining work
 
 ### Unconverted Fortran tests
 - testplot3d.f (1357 lines) — Plot3D (requires PGPLOT; interactive/graphical
-  test that cannot be fully converted without a graphics backend)
+  test that cannot be fully converted without a graphics backend).
+  A C port (testplot3d.c) exists and runs when PLplot is found.
+- regression.f (1515 lines) — stdout-diff regression harness. Deferred;
+  most functionality is already covered by individual class tests.
+
+### Potential future improvements
+- **joye_car_headers/**: Contains additional FITS WCS headers (CAR projection
+  variants from W. Joye) that could be added to plotter and wcsconv tests.
+  Note: 3 files (CAR_model, CHIPASS_Equ, cmap_3years_GP_D2) have non-FITS
+  preamble lines ("FITS headers in ...") that would need stripping first.
+- **Dead file cleanup**: The following files are no longer used and could be
+  removed in a future pass:
+  - `.ps` files (20 generated PostScript outputs, ~18 MB)
+  - Old build scripts: `doplot`, `makeplot`, `maketest`, `moctohtml`
+  - Duplicate `2dspline.dat` (identical to `2dspline_c.dat`)
+  - `asdftest.py` (standalone Python test, not integrated)
+  - `regression.current`, `regression.out` (old diff targets)
+  - `draw3d-test2.txt`, `draw3d-test3.txt` (unreferenced)
 
 ## Phase 3 details (complete)
 
@@ -180,4 +209,5 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
-Shows 65 default tests, all passing (minus pre-existing testresimp segfault).
+Shows 85 default tests (+ 20 conditional PLplot plotter smoke tests),
+all passing (minus pre-existing testresimp segfault).
