@@ -5,20 +5,20 @@
 #include <string.h>
 
 
-void stopit( int i, int *status );
-void check_imaging_wcs( AstObject *obj, const char *text, int *status );
-void check_tansip_wcs( AstObject *obj, const char *text, int *status );
-void check_equal_transforms( AstObject *obj, AstObject *obj2, const char *text, int *status );
-void check_sphmap_mappings( AstMapping *map, AstMapping *map2, const char *text, int *status );
+static void stopit( int i, int *status );
+static void check_imaging_wcs( AstObject *obj, const char *text, int *status );
+static void check_tansip_wcs( AstObject *obj, const char *text, int *status );
+static void check_equal_transforms( AstObject *obj, AstObject *obj2, const char *text, int *status );
+static void check_sphmap_mappings( AstMapping *map, AstMapping *map2, const char *text, int *status );
 
-void test_yamlencoding_attribute( int *status );
-void test_imaging_wcs_roundtrip( int *status );
-void test_tansip_wcs_roundtrip( int *status );
-void test_lsst_wcs_roundtrip( int *status );
-void test_native_encoding_roundtrip( int *status );
-void test_sphmap_roundtrip( int *status );
+static void test_yamlencoding_attribute( int *status );
+static void test_imaging_wcs_roundtrip( int *status );
+static void test_tansip_wcs_roundtrip( int *status );
+static void test_lsst_wcs_roundtrip( int *status );
+static void test_native_encoding_roundtrip( int *status );
+static void test_sphmap_roundtrip( int *status );
 
-int chrMatch( const char *a, const char *b ){
+static int chrMatch( const char *a, const char *b ){
    int result = 0;
    if( a && b ) result = !strcmp( a, b );
    return result;

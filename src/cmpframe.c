@@ -189,6 +189,9 @@ f     The CmpFrame class does not define any new routines beyond those
 *        Increase size of "buf2" buffer in SetAttrib, and trap buffer overflow.
 *     11-JAN-2017 (GSB):
 *        Override astSetDtai, astGetDtai and astClearDtai.
+*     8-APR-2026 (TIMJ):
+*        Use snprintf instead of sprintf in SetAttrib to prevent
+*        buffer overruns.
 *class--
 */
 
@@ -8513,9 +8516,9 @@ static void SetAttrib( AstObject *this_object, const char *setting, int *status 
 
 /* Create a new setting with the same name but with the axis index
    appropriate to the primary Frame. */
-               nc = sprintf( buf2, "%s(%d)=%s", buf1, paxis + 1,
-                             setting+value );
-               if( nc < BUF_LEN ) {
+               nc = snprintf( buf2, sizeof(buf2), "%s(%d)=%s", buf1, paxis + 1,
+                              setting+value );
+               if( nc >= 0 && nc < BUF_LEN ) {
 
 /* Attempt to access the attribute. */
                   astSetAttrib( pfrm, buf2 );

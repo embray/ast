@@ -94,6 +94,8 @@ f     The YamlChan class does not define any new routines beyond those
 *     13-APR-2025 (EMB):
 *        - Adapted to never versions of ASDF transform schemas.
 *        - Added support for the gwcs/spherical_cartesian transform.
+*     8-APR-2026 (TIMJ):
+*        Increase rowname buffer size in ReadPoly to prevent overrun.
 *class--
 */
 
@@ -8255,7 +8257,7 @@ static AstMapping *ReadPoly( AstYamlChan *this, AstKeyMap *km, int isortho,
    AstMapping *result;
    AstMapping *pm;
    AstWinMap *wm;
-   char rowname[20];
+   char rowname[30];
    double *cof_ptr;
    double *coeff_f;
    double *domain;
@@ -19289,10 +19291,3 @@ AstYamlChan *astLoadYamlChan_( void *mem, size_t size,
    Note that the member function may not be the one defined here, as it may
    have been over-ridden by a derived class. However, it should still have the
    same interface. */
-
-
-
-
-
-
-

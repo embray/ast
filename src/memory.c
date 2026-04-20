@@ -171,6 +171,10 @@
 *        threads occur sequentially rather than overlapping. Without
 *        this, the flagging of memory blocks as "permanent" is spurious (this
 *        only affects anything if AST is configured --with-memdebug).
+*     8-APR-2026 (TIMJ):
+*        Fix heap-use-after-free in astStore by copying data before
+*        freeing the old block. Increase stemp buffer size in
+*        astAppendStringf.
 */
 
 /* Configuration results. */
@@ -3076,7 +3080,7 @@ static char *ChrMatcher( const char *test, const char *end, const char *template
    char *result;
    char *sres;
    char *stest;
-   char stemp[10];
+   char stemp[24];
    const char *aaa;
    const char *aa;
    const char *a;
@@ -4123,8 +4127,8 @@ void *astStore_( void *ptr, const void *data, size_t size, int *status ) {
    necessary) and copy the data into it. */
          new = astMalloc( size );
          if ( astOK ) {
-            if ( ptr ) ptr = astFree( ptr );
             (void) memcpy( new, data, size );
+            if ( ptr ) ptr = astFree( ptr );
 
 /* If memory allocation failed, do not free the old memory but return
    a pointer to it. */

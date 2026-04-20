@@ -1,0 +1,38 @@
+# WCS converter regression tests -- pipe-delimited
+# Fields: name | input | reference | encoding | attrs | skip_string_compare
+# skip_string_compare: blank = run both string-diff and astequal tests
+#                      yes  = run astequal test only (ulp-level variation)
+timj_fits-wcs       | timj.ast                       | timj.fits-wcs      | fits-wcs  | cdmatrix=1,FitsDigits=8          |
+timj_fits-iraf      | timj.ast                       | timj.fits-iraf     | fits-iraf | FitsDigits=8                     |
+timj_fits-aips      | timj.ast                       | timj.fits-aips     | fits-aips | FitsDigits=8                     |
+timj_fits-pc        | timj.ast                       | timj.fits-pc       | fits-pc   | fitsrounding=0,FitsDigits=8      |
+timj_native         | timj.ast                       | timj.native        | native    | FitsDigits=8                     | yes
+a20070718_fits-wcs  | a20070718_00010_02_cube.ast     | a20070718_00010_02_cube.fits-wcs | fits-wcs | FitsDigits=8      |
+dss_fits-dss_ast    | dss.fits-dss                   | dss.ast            | ast       | FitsDigits=8                     |
+dss_ast_dss         | dss.ast                        | dss.dss            | dss       | FitsDigits=8                     |
+dss_ast_fits-wcs    | dss.ast                        | dss.fits-wcs       | fits-wcs  | cdmatrix=1,FitsDigits=8          |
+degen1_fits-wcs     | degen1.ast                     | degen1.fits-wcs    | fits-wcs  | cdmatrix=1,FitsDigits=8          |
+sip_fits-wcs        | sip.head                       | sip.fits-wcs       | fits-wcs  | cdmatrix=1,sipreplace=0,FitsDigits=8 |
+sip2_fits-wcs       | sip2.head                      | sip2.fits-wcs      | fits-wcs  | cdmatrix=1,sipreplace=0,FitsDigits=8 |
+lsst_fits-wcs       | lsst.ast                       | lsst.fits-wcs      | fits-wcs  | cdmatrix=1,FitsDigits=8          |
+longslit_fits-wcs   | longslit.fits-pc               | longslit.fits-wcs  | fits-wcs  | cdmatrix=1,FitsDigits=8          |
+aitoff_native       | aitoff.head                    | aitoff.native      | native    |                                  | yes
+car1_native         | car1.head                      | car1.native        | native    | carlin=1                         | yes
+car2_native         | car2.head                      | car2.native        | native    | carlin=1                         | yes
+car3_native         | car3.head                      | car3.native        | native    |                                  | yes
+car4_native         | car4.head                      | car4.native        | native    | carlin=1                         | yes
+car5_native         | car5.head                      | car5.native        | native    |                                  | yes
+car6_native         | car6.head                      | car6.native        | native    |                                  | yes
+cobe_native         | cobe.head                      | cobe.native        | native    |                                  | yes
+hpx_native          | hpx.head                       | hpx.native         | native    |                                  | yes
+origin_native       | origin.head                    | origin.native      | native    |                                  | yes
+polco_native        | polco.head                     | polco.native       | native    |                                  | yes
+polco2_native       | polco2.head                    | polco2.native      | native    |                                  | yes
+scp_native          | scp.head                       | scp.native         | native    |                                  | yes
+serpens_native      | serpens.head                   | serpens.native     | native    |                                  | yes
+specflux_native     | specflux.head                  | specflux.native    | native    |                                  | yes
+timeplot_native     | timeplot.head                  | timeplot.native    | native    |                                  | yes
+tnx_native          | tnx.head                       | tnx.native         | native    |                                  | yes
+tsc_native          | tsc.head                       | tsc.native         | native    |                                  | yes
+zpn_native          | zpn.head                       | zpn.native         | native    |                                  | yes
+zpx_native          | zpx.head                       | zpx.native         | native    |                                  | yes

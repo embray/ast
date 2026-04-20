@@ -1,0 +1,102 @@
+/*
+ *  ast_astequal: semantic equality check for two AST object files.
+ *  Both files must be in the same encoding.
+ *
+ *  Usage:
+ *     ast_astequal <file_a> <file_b> <encoding> [<attrs>]
+ *
+ *  Reads both files as AST Objects (via astChannel for AST dumps, via
+ *  astFitsChan for every other encoding) and exits 0 if astEqual
+ *  reports the two Objects equivalent, 1 if not, 2 on any internal
+ *  failure.
+ *
+ *  This complements byte-level diff tests: astEqual absorbs
+ *  platform-specific serialisation and 1-ulp arithmetic drift that a
+ *  textual comparison can trip over, while the string test still
+ *  catches unintentional changes to AST's output format.
+ */
+
+#include "ast.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+static AstObject *read_file( const char *path, const char *encoding,
+                             const char *attrs ) {
+   AstObject *obj = NULL;
+
+   if( strcasecmp( encoding, "AST" ) == 0 ) {
+      AstChannel *chan = astChannel( NULL, NULL, "SourceFile=%s", path );
+      obj = astRead( chan );
+      astAnnul( chan );
+   } else {
+      AstFitsChan *fc = astFitsChan( NULL, NULL, "%s", attrs );
+      FILE *fp = fopen( path, "r" );
+      char line[256];
+      if( !fp ) {
+         fprintf( stderr, "ast_astequal: cannot open '%s'\n", path );
+         astAnnul( fc );
+         return NULL;
+      }
+      while( fgets( line, (int) sizeof( line ), fp ) ) {
+         size_t n = strlen( line );
+         while( n > 0 && ( line[n-1] == '\n' || line[n-1] == '\r' ) ) {
+            line[--n] = '\0';
+         }
+         astPutFits( fc, line, 0 );
+      }
+      fclose( fp );
+      astClear( fc, "CARD" );
+      obj = astRead( fc );
+      astAnnul( fc );
+   }
+
+   return obj;
+}
+
+int main( int argc, char *argv[] ) {
+   int status_value = 0;
+   int *status = &status_value;
+
+   if( argc < 4 ) {
+      fprintf( stderr,
+               "Usage: ast_astequal <file_a> <file_b> <encoding> "
+               "[<attrs>]\n" );
+      return 2;
+   }
+
+   const char *fa    = argv[1];
+   const char *fb    = argv[2];
+   const char *enc   = argv[3];
+   const char *attrs = ( argc >= 5 ) ? argv[4] : " ";
+
+   astWatch( status );
+   astTune( "ObjectCaching", 1 );
+
+   AstObject *a = read_file( fa, enc, attrs );
+   AstObject *b = read_file( fb, enc, attrs );
+
+   if( !a || !b || !astOK ) {
+      fprintf( stderr,
+               "ast_astequal: could not read one or both files "
+               "(%s, %s)\n", fa, fb );
+      if( a ) astAnnul( a );
+      if( b ) astAnnul( b );
+      return 2;
+   }
+
+   int equal = astEqual( a, b );
+   if( !equal ) {
+      fprintf( stderr,
+               "ast_astequal: astEqual returned 0 for %s vs %s\n",
+               fa, fb );
+   }
+
+   astAnnul( a );
+   astAnnul( b );
+
+   if( !astOK ) return 2;
+   return equal ? 0 : 1;
+}

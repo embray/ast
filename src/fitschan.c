@@ -1279,6 +1279,9 @@ f     - AST_WRITEFITS: Write all cards out to the sink function
 *        determine if a PolyMap conforming to the requirements of the SIP
 *        paper can be created from the supplied FrameSet by various
 *        rearrangement of the pixel->sky Mapping in the FrameSet.
+*     8-APR-2026 (TIMJ):
+*        Use larger bounded buffers in a few internal formatting paths and
+*        guard Match against zero returned fields when reversing them.
 *class--
 */
 
@@ -1725,7 +1728,7 @@ static int mark_new = 0;
 static int createkeyword_seq_nchars = -1;
 
 /* Buffer for value returned by FormatKey */
-static char formatkey_buff[ 10 ];
+static char formatkey_buff[ 40 ];
 
 /* Buffer for value returned by FitsGetCom */
 static char fitsgetcom_sval[ AST__FITSCHAN_FITSCARDLEN + 1 ];
@@ -7711,7 +7714,7 @@ static int CnvType( int otype, void *odata, size_t osize, int type, int undef,
             CheckZero( cnvtype_text0, ( (double *) odata )[ 0 ], 0, fitsrnd, status );
             (void) sprintf( cnvtype_text1, "%.*g", AST__DBL_DIG, ( (double *) odata )[ 1 ] );
             CheckZero( cnvtype_text1, ( (double *) odata )[ 1 ], 0, fitsrnd, status );
-            (void) sprintf( cnvtype_text, "%s %s", cnvtype_text0, cnvtype_text1 );
+            (void) snprintf( cnvtype_text, sizeof(cnvtype_text), "%s %s", cnvtype_text0, cnvtype_text1 );
             *( (char **) buff ) = cnvtype_text;
          } else if( type == AST__INT      ){
             *( (int *) buff ) = (int) odouble;
@@ -11717,7 +11720,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
    len = 0;
 
 /* Store the supplied keyword base name. */
-   if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%s", key ) ) >= 0 ){
+   if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%s", key ) ) >= 0 ){
       len += nc;
    } else {
       len = -1;
@@ -11725,7 +11728,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 
 /* If index c1 has been supplied, append it to the end of the string. */
    if( c1 >= 0 ) {
-      if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%d", c1 ) ) >= 0 ){
+      if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%d", c1 ) ) >= 0 ){
          len += nc;
       } else {
          len = -1;
@@ -11734,7 +11737,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 /* If index c2 has been supplied, append it to the end of the string,
    preceded by an underscore. */
       if( c2 >= 0 ) {
-         if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "_%d", c2 ) ) >= 0 ){
+         if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "_%d", c2 ) ) >= 0 ){
             len += nc;
          } else {
             len = -1;
@@ -11745,7 +11748,7 @@ static char *FormatKey( const char *key, int c1, int c2, char s, int *status ){
 /* If a co-ordinate version character has been supplied, append it to the end
    of the string. */
    if( s != ' ' ) {
-      if( len >= 0 && ( nc = sprintf( formatkey_buff + len, "%c", s ) ) >= 0 ){
+      if( len >= 0 && ( nc = snprintf( formatkey_buff + len, sizeof(formatkey_buff) - len, "%c", s ) ) >= 0 ){
          len += nc;
       } else {
          len = -1;
@@ -22584,12 +22587,14 @@ static int Match( const char *test, const char *temp, int maxfld, int *fields,
    in the same order that they occur in the template. */
    if( !match_nentry ){
       nfret = ( *nfld < maxfld ) ? (*nfld) : maxfld;
-      match_pa = fields;
-      match_pb = fields + nfret - 1;
-      for( i = 0; i < nfret/2; i++ ){
-         tmp = *match_pa;
-         *(match_pa++) = *match_pb;
-         *(match_pb--) = tmp;
+      if( nfret > 1 ) {
+         match_pa = fields;
+         match_pb = fields + nfret - 1;
+         for( i = 0; i < nfret/2; i++ ){
+            tmp = *match_pa;
+            *(match_pa++) = *match_pb;
+            *(match_pb--) = tmp;
+         }
       }
    }
 
@@ -38721,9 +38726,12 @@ static AstMapping *WcsOthers( AstFitsChan *this, FitsStore *store, char s,
 /* Append the CTYPE value to the final Domain value for the primary Frame. */
             if( ckeyval && astChrLen( ckeyval ) > 0 ) {
                if( newdom ) {
-                  sprintf( buf, "%s-%s", newdom, buf2 );
+                  char tmpbuf[ 600 ];
+                  snprintf( tmpbuf, sizeof(tmpbuf), "%s-%s", newdom, buf2 );
+                  strncpy( buf, tmpbuf, sizeof(buf) );
+                  buf[ sizeof(buf) - 1 ] = '\0';
                } else {
-                  sprintf( buf, "%s", buf2 );
+                  snprintf( buf, sizeof(buf), "%s", buf2 );
                   newdom = buf;
                }
             }
@@ -45186,9 +45194,6 @@ static void ListFC( AstFitsChan *this, const char *ttl ) {
    this->card = cardo;
 }
 */
-
-
-
 
 
 

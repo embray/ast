@@ -163,6 +163,8 @@ f     - AST_TESTCELL: Test if a single HEALPix cell is included in a Moc
 *     13-JUN-2025 (DSB):
 *        - Fix memory leak in RegBaseMesh.
 *        - Remove unused variable from RegBaseMesh.
+*     8-APR-2026 (TIMJ):
+*        Guard against null pointer in error message formatting.
 *class--
 */
 
@@ -1548,7 +1550,7 @@ void astAddMocText_( AstMoc *this, int maxorder,
          } else if( *json ) {
             if( state != 9 && astOK ) {
                astError( AST__INMOC, "%s(%s): Invalid JSON MOC supplied: '%.30s...'",
-                         status, method, astGetClass( this ), text );
+                         status, method, astGetClass( this ), text ? text : "" );
                astError( AST__INMOC, "No closing curly brace found.", status );
             }
 
@@ -1558,7 +1560,7 @@ void astAddMocText_( AstMoc *this, int maxorder,
          } else if( state == 2 ) {
             if( order < 0 ) {
                astError( AST__INMOC, "%s(%s): Invalid string MOC supplied: '%.30s...'",
-                         status, method, astGetClass( this ), text );
+                         status, method, astGetClass( this ), text ? text : "" );
                astError( AST__INMOC, "No order value found at start of string.",
                          status );
             }

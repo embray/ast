@@ -1,0 +1,7 @@
+# Simplify regression tests -- pipe-delimited
+# Fields: name | input | reference | skip_string_compare
+# skip_string_compare: blank = run both string-diff and astequal tests
+#                      yes  = run astequal test only (ulp-level variation)
+brad  | brad.map  | brad.simp  |
+lsst1 | lsst1.map | lsst1.simp |
+rigby | rigby.map | rigby.simp | yes

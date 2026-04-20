@@ -735,6 +735,11 @@ f     - Title: The Plot title drawn using AST_GRID
 *        has been set. Previously, the set value was used without change
 *        if Format was set, but this caused things like 5 minor gaps
 *        between major tick values 40 and 44.
+*     15-APR-2026 (TIMJ):
+*        Fix buffer overread in GrfItem when appending text suffix to
+*        the item description. astStore was called with a size larger than
+*        the source data, causing memcpy to read past the end of the
+*        string literal.
 
 *class--
 */
@@ -18130,8 +18135,16 @@ static char *GrfItem( int item, const char *text, int *axis, int *status ){
       dlen = strlen( desc );
 
       if( text ) {
-         ret = astStore( NULL, desc, dlen + strlen( text ) + 1 );
-         if( ret ) strcpy( ret + dlen, text );
+
+/* Cannot use astStore here because the allocation size (desc + text)
+   exceeds the length of the source data (desc alone), and astStore
+   copies size bytes from the source via memcpy. Instead, allocate the
+   full buffer and copy desc and text separately. */
+         ret = astMalloc( dlen + strlen( text ) + 1 );
+         if( ret ) {
+            memcpy( ret, desc, dlen );
+            strcpy( ret + dlen, text );
+         }
       } else {
          ret = astStore( NULL, desc, dlen + 1 );
       }

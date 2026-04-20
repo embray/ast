@@ -7,10 +7,12 @@ dnl   1.5.  It should work with autoconf versions 2.50 or better, and
 dnl   automake 1.6 or better.
 
 dnl   Initialisation: package name and version number
-m4_define([v_maj], [9])
-m4_define([v_min], [3])
-m4_define([v_mic], [1])
-m4_define([project_version], [v_maj.v_min.v_mic])
+dnl   Keep the canonical version in version.number so CMake and Autotools
+dnl   both read the same value.
+m4_define([project_version], m4_esyscmd_s([tr -d '\n' < version.number]))
+m4_define([v_maj], m4_esyscmd_s([awk -F. 'NR==1 {print $1}' version.number]))
+m4_define([v_min], m4_esyscmd_s([awk -F. 'NR==1 {print $2}' version.number]))
+m4_define([v_mic], m4_esyscmd_s([awk -F. 'NR==1 {print $3}' version.number]))
 AC_INIT([ast],[project_version],[starlink@jiscmail.ac.uk])
 AC_CONFIG_AUX_DIR([build-aux])
 

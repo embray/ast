@@ -1,8 +1,18 @@
 #include "ast.h"
+#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 
-int main(){
+/* Helper to extract basename from a file path, since __FILE__ may
+   include a directory prefix in out-of-source builds. */
+static const char *baseName( const char *path ) {
+   static char buffer[ 1024 ];
+   if( !path ) return path;
+   snprintf( buffer, sizeof( buffer ), "%s", path );
+   return basename( buffer );
+}
+
+int main( void ){
    const char *routine;
    const char *file;
    int i;
@@ -10,6 +20,7 @@ int main(){
    char *pickle1;
    char *pickle2;
    AstSkyFrame *sf = astSkyFrame( " " );
+   int bf_line = __LINE__ + 1;
    AstFrame *bf = astFrame( 2, "Domain=SKY" );
    AstFrameSet *fs = astConvert( bf, sf, " " );
    AstKeyMap *km;
@@ -17,6 +28,7 @@ int main(){
 
    if( fs ) {
       pickle1 = astToString( fs );
+      int fs2_line = __LINE__ + 1;
       AstFrameSet *fs2 = astFromString( pickle1 );
       pickle2 = astToString( fs2 );
       if( pickle1 && pickle2 ) {
@@ -39,11 +51,11 @@ int main(){
       if( ( !routine || strcmp( routine, "main" ) ) && astOK ) {
          astError( AST__INTER, "Error 31\n" );
       }
-      if( ( !file || strcmp( file, "testobject.c" ) ) && astOK ) {
+      if( ( !file || strcmp( baseName(file), "testobject.c" ) ) && astOK ) {
          astError( AST__INTER, "Error 32\n" );
       }
-      if( line != 13 && astOK ) {
-         astError( AST__INTER, "Error 33 (line is %d)\n", line );
+      if( line != bf_line && astOK ) {
+         astError( AST__INTER, "Error 33 (line is %d, expected %d)\n", line, bf_line );
       }
 
 
@@ -71,10 +83,10 @@ int main(){
                   if( ( !routine || strcmp( routine, "main" ) ) && astOK ) {
                      astError( AST__INTER, "Error 363\n" );
                   }
-                  if( ( !file || strcmp( file, "testobject.c" ) ) && astOK ) {
+                  if( ( !file || strcmp( baseName(file), "testobject.c" ) ) && astOK ) {
                      astError( AST__INTER, "Error 364\n" );
                   }
-                  if( line != 13 && astOK ) {
+                  if( line != bf_line && astOK ) {
                      astError( AST__INTER, "Error 365 (line is %d)\n", line );
                   }
                }
@@ -90,11 +102,11 @@ int main(){
                   if( ( !routine || strcmp( routine, "main" ) ) && astOK ) {
                      astError( AST__INTER, "Error 373\n" );
                   }
-                  if( ( !file || strcmp( file, "testobject.c" ) ) && astOK ) {
+                  if( ( !file || strcmp( baseName(file), "testobject.c" ) ) && astOK ) {
                      astError( AST__INTER, "Error 374\n" );
                   }
-                  if( line != 20 && astOK ) {
-                     astError( AST__INTER, "Error 375 (line is %d)\n", line );
+                  if( line != fs2_line && astOK ) {
+                     astError( AST__INTER, "Error 375 (line is %d, expected %d)\n", line, fs2_line );
                   }
                }
             } else {

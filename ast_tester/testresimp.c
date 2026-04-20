@@ -11,21 +11,30 @@
 #include "winmap.h"
 #include "mapping.h"
 
-int main(){
+void astBegin_( void );
+void astEnd_( int * );
+
+int main( void ){
    int status_value = 0;
    int *status = &status_value;
    double shift;
    AstMapping *map1, *map2;
    int series, inv1, inv2;
+   AstShiftMap *sm1;
+   AstZoomMap *zm1;
+   AstCmpMap *cm1, *cm2;
+   AstMapping *m1, *m2;
+
+   astBegin_();
 
    shift = 1.0;
-   AstShiftMap *sm1 = astShiftMap( 1, &shift, " ", status );
-   AstZoomMap *zm1 = astZoomMap( 1, 2.0, " ", status );
-   AstCmpMap *cm1 = astCmpMap( sm1, zm1, 1, " ", status );
-   AstMapping *m1 = astCopy( cm1 );
+   sm1 = astShiftMap( 1, &shift, " ", status );
+   zm1 = astZoomMap( 1, 2.0, " ", status );
+   cm1 = astCmpMap( sm1, zm1, 1, " ", status );
+   m1 = astCopy( cm1 );
    astInvert( m1 );
-   AstCmpMap *cm2 = astCmpMap( cm1, m1, 1, " ", status );
-   AstMapping *m2 = astSimplify( cm2 );
+   cm2 = astCmpMap( cm1, m1, 1, " ", status );
+   m2 = astSimplify( cm2 );
 
    if( !astIsAUnitMap( m2 ) && astOK ){
       astError( AST__INTER, "Error 1\n",  status );
@@ -112,6 +121,8 @@ int main(){
    sm1 = astShiftMap( 1, &shift, " ", status );
    cm1 = astCmpMap( wm, sm1, 1, " ", status );
    m2 = astSimplify( cm1 );
+
+   astEnd_( status );
 
    if( astOK ) {
       printf(" All restricted simplify tests passed\n");

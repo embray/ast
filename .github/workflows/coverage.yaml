@@ -1,0 +1,60 @@
+name: Coverage
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libyaml-dev lcov libplplot-dev plplot-driver-cairo
+
+      - name: Configure
+        env:
+          CC: gcc
+        run: >
+          cmake -B build-coverage
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_SHARED_LIBS=OFF
+          -DAST_ENABLE_COVERAGE=ON
+          -DAST_C_STANDARD=11
+
+      - name: Build
+        run: cmake --build build-coverage --parallel
+
+      - name: Run tests and generate coverage report
+        run: cmake --build build-coverage --target coverage-report
+
+      - name: Generate HTML coverage report
+        run: cmake --build build-coverage --target coverage-html
+        continue-on-error: true
+
+      - name: Upload lcov report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: build-coverage/coverage/lcov.info
+
+      - name: Upload HTML coverage artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('build-coverage/coverage/html/index.html') != '' }}
+        with:
+          name: coverage-html
+          path: build-coverage/coverage/html
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          files: build-coverage/coverage/lcov.info
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}

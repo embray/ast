@@ -17,6 +17,26 @@ environment-independent.
 Main Changes in this Version
 ----------------------------
 
+- Added a new README.md file to provide simple instructions on how to build
+  and test the library.
+- Added a new experimental build system based on CMake. This build system
+  has not been tested for installations and currently exists primarily to
+  simplify testing without any Starlink software installed. It does not
+  build the Fortran interface.
+- Converted many Fortran test files to C. Currently these are only enabled
+  in the CMake build.
+- Fixed some memory corruptions found with the new testing harness.
+- Added an experimental PLplot graphics library plugin to allow graphics
+  testing without requiring PGPLOT. The text bounding boxes on Linux are not
+  as accurate as those from PGPLOT due to a limitation of the PLplot API.
+- Clarified the license situation by removing historical files. This library
+  is licensed with the Gnu Lesser General Public License.
+- Fixed a bug in FitsChan serializations that resulted in some cases a number
+  being converted to a string with a leading space.
+
+Main Changes in V9.3.0
+----------------------
+
 - A new subclass of Mapping, a SplineMap, has been added, which
   represents a 2-in, 2-out Mapping defined by a pair of two-dimensional
   B-spline surfaces.
