@@ -96,6 +96,9 @@ f     The YamlChan class does not define any new routines beyond those
 *        - Added support for the gwcs/spherical_cartesian transform.
 *     8-APR-2026 (TIMJ):
 *        Increase rowname buffer size in ReadPoly to prevent overrun.
+*     20-APR-2026 (TIMJ):
+*        Fix buffer overread in LibYamlWriter where astStore copied one
+*        byte past the end of the source buffer.
 *class--
 */
 
@@ -6050,11 +6053,16 @@ static int LibYamlWriter( void *data, yaml_char_t *buffer,
 
 /* If the current buffer character is a newline, or we have reached the
    end of the buffer, get a null terminated copy of the line that ends
-   here, then write it out using astPutNextText. */
+   here, then write it out using astPutNextText. Cannot use astStore here
+   because it would memcpy nc+1 bytes from a buffer that may only contain
+   nc valid bytes (when pb == pend). */
       if( pb == pend || *pb == '\n' ){
          nc = pb - pstart;
-         line = astStore( line, pstart, nc + 1 );
-         if( astOK ) line[ nc ] = 0;
+         line = astRealloc( line, nc + 1 );
+         if( astOK ) {
+            memcpy( line, pstart, nc );
+            line[ nc ] = 0;
+         }
          astPutNextText( this, line );
 
 /* Indicate any subsequent line starts at the next character. */
