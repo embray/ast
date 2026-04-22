@@ -1282,6 +1282,10 @@ f     - AST_WRITEFITS: Write all cards out to the sink function
 *     8-APR-2026 (TIMJ):
 *        Use larger bounded buffers in a few internal formatting paths and
 *        guard Match against zero returned fields when reversing them.
+*     22-APR-2026 (DSB):
+*        In SpecTrans, only attempt to convert CLASS specific keywords
+*        into standard FITS-WCS keywords for the primary axis descriptions
+*        since CLASS does not support alternate axis descriptions.
 *class--
 */
 
@@ -31577,7 +31581,7 @@ static AstFitsChan *SpecTrans( AstFitsChan *this, int encoding,
 
 /* Things specific to the CLASS encoding
    ------------------------------------- */
-      if( encoding == FITSCLASS_ENCODING ) ClassTrans( this, ret, axlat,
+      if( s == ' ' && encoding == FITSCLASS_ENCODING ) ClassTrans( this, ret, axlat,
                                                        axlon, method, class, status );
 
 /* Convert SAO distorted TAN headers to TPN distorted TAN headers.
