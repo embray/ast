@@ -416,6 +416,7 @@ set(AST_H_FILES
     src/frameset.h
     src/plot.h
     src/plot3d.h
+    src/grf_plplot.h
     src/skyframe.h
     src/specframe.h
     src/dsbspecframe.h

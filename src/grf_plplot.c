@@ -49,6 +49,7 @@
 /* --------------- */
 #include <float.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <plplot.h>              /* PLPlot native C API */
 #ifdef HAVE_PLSTRL
@@ -58,10 +59,21 @@
 /* Constants. */
 /* ========== */
 #define R2D 57.29578             /* Radians to degrees factor */
+#define AST_PLPLOT_MAX_DEV 32
 
 /* Globals */
 /* ======= */
 static PLINT current_color = 1;
+
+/* Global array of available PLplot device names; initialized by
+ * astPlInitDeviceList */
+static const char **pl_devnames = NULL;
+
+/* Number of available plplot devices
+ *
+ * Defaults to 32 which sets the max allowed to probe with plgDevs();
+ * this in turn sets the actual number of devices found */
+static int pl_ndev = AST_PLPLOT_MAX_DEV;
 
 /* Helper function to replace ASCII hyphen with Unicode minus sign for better typography */
 static char *format_text(const char *in_text) {
@@ -98,8 +110,175 @@ static char *format_text(const char *in_text) {
     return out;
 }
 
+/* Private helper functions for PLplot device configuration. */
+/* ========================================================= */
+
+/* Initialize global array of available plplot devices */
+static void astPlInitDeviceList( void ) {
+   const char **menustr;
+
+   if (pl_devnames)
+      return;
+
+   menustr = calloc(pl_ndev, sizeof(*menustr));
+
+   if ( !menustr )
+      return;
+
+   pl_devnames = calloc(pl_ndev, sizeof(*pl_devnames));
+
+   if ( !pl_devnames ) {
+      free( menustr );
+      return;
+   }
+
+   /* Not-well advertised but available API for probing supported devices */
+   plgDevs(&menustr, &pl_devnames, &pl_ndev);
+   free( menustr );
+}
+
+
+/* Probe available device list for support */
+static int astPlDeviceAvailable( const char *dev ) {
+   int idx;
+
+   astPlInitDeviceList();
+
+   for (idx = 0; idx < pl_ndev; idx++) {
+      if (strcmp(pl_devnames[idx], dev) == 0)
+         return 1;
+   }
+
+   return 0;
+}
+
+
+/* Depending on the output filename choose the best available plplot device */
+static const char *astPlChooseDeviceForExtension( const char *ext ) {
+   int idx;
+
+   if (!ext)
+      return "psc";
+
+   if (strcmp(ext, ".pdf") == 0) {
+      const char *candidates[] = {
+         "pdfcairo", // best
+         "pdf",      // generic but widely supported
+         "psc",      // last resort
+         NULL
+      };
+
+      for (idx = 0; candidates[idx]; idx++) {
+         if (astPlDeviceAvailable( candidates[ idx ] ))
+            return candidates[ idx ];
+      }
+   }
+
+   if (strcmp(ext, ".png") == 0) {
+      const char *candidates[] = {
+         "pngcairo",
+         "png",
+         NULL
+      };
+
+      for (idx = 0; candidates[idx]; idx++) {
+         if (astPlDeviceAvailable( candidates[ idx ] ))
+            return candidates[ idx ];
+      }
+   }
+
+   if (strcmp(ext, ".svg") == 0) {
+      const char *candidates[] = {
+         "svgcairo",
+         "svg",
+         NULL
+      };
+
+      for (idx = 0; candidates[idx]; idx++) {
+         if (astPlDeviceAvailable( candidates[ idx ] ))
+            return candidates[ idx ];
+      }
+   }
+
+   return "psc";
+}
+
 /* Externally visible functions. */
 /* ============================= */
+
+/*
+*  Name:
+*     astPlSetupDevice
+
+*  Purpose:
+*     Select and configure an appropriate device for PLplot depending on the
+*     target output.
+
+*  Type:
+*     Public function.
+
+*  Synopsis:
+*     #include "grf_plplot.h"
+*     const char *astPlSetupDevice( const char *output )
+
+*  Description:
+*     This function encapuslates the logic for selecting the best available
+*     PLplot output device either for interactive plotting or for a given
+*     filename extension.
+*
+*     This is not required to be used, but provides some sensible defaults
+*     for best results, and can also prevent PLplot from hanging waiting for
+*     stdin in cases where a device is not available.
+
+*  Parameters:
+*     output
+*        Optional output filename or interactive plotting window. It can be:
+*        - A file ending in ".pdf": generates a PDF file (pdfcairo with fallback
+*          to the generic pdf device, or psc).
+*        - A file ending in ".png": generates a PNG file (pngcairo with fallback
+*          to the generic png device).
+*        - A file ending in ".svg": generates an SVG file (svgcairo with fallback
+*          to the generic svg device).
+*        - "aqt", "xwin", "xcairo", "qtwidget": interactive window.
+*        - Any other name: PostScript (psc device).
+*        - If all else fails outputs to the "null" device.
+
+*  Returned Value:
+*     The name of the device selected.
+*/
+const char *astPlSetupDevice( const char *output ) {
+   const char *ext;
+   const char *dev;
+
+   if( strcmp(output, "aqt") == 0 || strcmp(output, "xwin") == 0 ||
+       strcmp(output, "xcairo") == 0 || strcmp(output, "qtwidget") == 0 ) {
+
+      if (astPlDeviceAvailable( output )) {
+         c_plsdev( output );
+         return output;
+      } else {
+         astError( AST__GRFER, "astPlSetupDevice: selected plplot output "
+                   "device %s not available; falling back on null device\n",
+                   output );
+         c_plsdev( "null" );
+         return "null";
+      }
+   }
+
+   ext = strrchr( output, '.' );
+   dev = astPlChooseDeviceForExtension( ext );
+
+   if ( !astPlDeviceAvailable( dev ) ) {
+      astError( AST__GRFER, "astPlSetupDevice: plplot output device %s for "
+                "%s files not available; falling back on null device\n", ext,
+                output );
+      dev = "null";
+   }
+
+   c_plsdev( dev );
+   c_plsfnam( output );
+   return dev;
+}
 
 int astGBBuf( void ){
    /* PLplot has no explicit begin-buffer function; it manages its own updates. */
