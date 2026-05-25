@@ -3,6 +3,7 @@
 # These are the existing C test programs, plus Fortran tests that have
 # been converted to C.  All tests use CTest and do not require any
 # Starlink infrastructure.
+include(CheckCSourceRuns)
 
 # Ensure test executables find the locally-built libast before any
 # system-installed version (e.g. from a conda environment whose lib
@@ -288,6 +289,18 @@ target_link_libraries(simplify PRIVATE ${TEST_LIBS})
 target_compile_definitions(simplify PRIVATE HAVE_CONFIG_H)
 ast_apply_dev_options(simplify)
 
+add_executable(normalize_fixture normalize_fixture.c)
+target_include_directories(normalize_fixture PRIVATE ${TEST_INCLUDES})
+target_link_libraries(normalize_fixture PRIVATE ${TEST_LIBS})
+target_compile_definitions(normalize_fixture PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(normalize_fixture)
+
+add_executable(gen_simplify_fixtures gen_simplify_fixtures.c)
+target_include_directories(gen_simplify_fixtures PRIVATE ${TEST_INCLUDES})
+target_link_libraries(gen_simplify_fixtures PRIVATE ${TEST_LIBS})
+target_compile_definitions(gen_simplify_fixtures PRIVATE HAVE_CONFIG_H)
+ast_apply_dev_options(gen_simplify_fixtures)
+
 # Helper to register simplify regression tests.
 # Each call copies the input .map and reference .simp files into the build
 # tree and registers two ctest entries:
@@ -470,7 +483,48 @@ foreach(_entry IN LISTS _grid_tests)
 endforeach()
 
 if(PLPLOT_FOUND)
+    # --- Determine if pdfcairo is available ---
+    # If not, plplot falls back on the "pdf" device which uses libHaru, which
+    # fails with some of the pdf tests; if the pdfcairo device is not availble
+    # then we just mark these tests as expected failures.
+
+    set(CMAKE_REQUIRED_INCLUDES ${PLPLOT_INCLUDE_DIRS})
+    set(CMAKE_REQUIRED_LIBRARIES ${PLPLOT_LIBRARIES})
+    set(CMAKE_REQUIRED_LINK_DIRECTORIES ${PLPLOT_LIBRARY_DIRS})
+    check_c_source_runs("
+    #include <string.h>
+    #include <plplot.h>
+
+    int main(void) {
+        const char *menustr[32];
+        const char *devnames[32];
+        const char **pmenustr = menustr;
+        const char **pdevnames = devnames;
+        int idx;
+        int pl_ndev = 32;
+        plgDevs(&pmenustr, &pdevnames, &pl_ndev);
+        for (idx = 0; idx < pl_ndev; idx++) {
+            if (devnames[idx] && strcmp(devnames[idx], \"pdfcairo\") == 0)
+                return 0;
+        }
+        return 1;
+    }
+    " HAVE_PLPLOT_PDFCAIRO)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_LINK_DIRECTORIES)
+
+    # Plotter tests that are known to fail without pdfcairo
+    set(PLOTTER_XFAIL_NO_PDFCAIRO
+        car4
+        car6
+        specflux
+        timeplot
+    )
+
+    configure_file(lsst.fits-wcs "${CMAKE_CURRENT_BINARY_DIR}/lsst.fits-wcs" COPYONLY)
     ast_add_test(testplotter
+        SOURCES testplotter.c plplotutil.c
         NO_DEFAULT_GRF_LIBS
         EXTRA_LIBS $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf_plplot> $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf3d_plplot> ${PLPLOT_LIBRARIES}
         TEST_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/lsst.fits-wcs" " " " " "testplotter.ps"
@@ -479,6 +533,7 @@ if(PLPLOT_FOUND)
     target_link_directories(testplotter PRIVATE ${PLPLOT_LIBRARY_DIRS})
 
     ast_add_test(testplot3d_c
+        SOURCES testplot3d.c plplotutil.c
         NO_DEFAULT_GRF_LIBS
         SOURCES testplot3d.c
         EXTRA_LIBS $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf_plplot> $<LINK_LIBRARY:WHOLE_ARCHIVE,ast_grf3d_plplot> ${PLPLOT_LIBRARIES}
@@ -524,9 +579,20 @@ if(PLPLOT_FOUND)
                 "-DBOX=${_box_arg}"
                 -P "${CMAKE_SOURCE_DIR}/cmake/run_plotter_test.cmake"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+
         if(AST_ENABLE_SANITIZERS)
             set_tests_properties(plotter_${P_NAME} PROPERTIES
                 ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+        endif()
+
+        # Mark test as expected failure if it's one known not to work
+        # without pdfcairo
+        if(NOT HAVE_PLPLOT_PDFCAIRO)
+            list(FIND PLOTTER_XFAIL_NO_PDFCAIRO "${P_NAME}" _idx)
+            if(NOT _idx EQUAL -1)
+                set_tests_properties(plotter_${P_NAME} PROPERTIES
+                    WILL_FAIL TRUE)
+            endif()
         endif()
     endfunction()
 
@@ -550,8 +616,8 @@ if(PLPLOT_FOUND)
         endif()
         add_plotter_test(${_args})
     endforeach()
-
 endif()
+
 
 # ============================================================
 # Fortran tests (AST_BUILD_FORTRAN=ON only)
