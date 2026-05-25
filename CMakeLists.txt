@@ -18,6 +18,7 @@ include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckTypeSize)
 include(CheckCSourceCompiles)
+include(CheckCCompilerFlag)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -33,6 +34,7 @@ option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
 option(AST_ENABLE_WARNINGS "Enable extra compiler warnings for development builds" OFF)
 option(AST_ENABLE_SANITIZERS "Enable address/undefined sanitizers for supported compilers" OFF)
 option(AST_ENABLE_COVERAGE "Enable compiler coverage instrumentation for supported compilers" OFF)
+option(AST_ENABLE_SIMD "Enable SIMD/vectorization via GCC+glibc libmvec (sphmap, matrixmap)" OFF)
 option(AST_ENABLE_HUGE_TEST "Build the huge manual stress test converted from testhuge.f" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
@@ -124,6 +126,56 @@ if(AST_ENABLE_COVERAGE)
         )
     else()
         message(WARNING "AST_ENABLE_COVERAGE is ON, but no coverage profile is defined for compiler ${CMAKE_C_COMPILER_ID}")
+    endif()
+endif()
+
+set(AST_SIMD_SPH_FLAGS)   # sphmap.c: trig vectorization via libmvec
+set(AST_SIMD_MAT_FLAGS)   # matrixmap.c: AVX2 auto-vec (no fast-math)
+
+if(AST_ENABLE_SIMD)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        check_c_compiler_flag(-fopenmp-simd    HAVE_FOPENMP_SIMD)
+        check_c_compiler_flag(-ffast-math      HAVE_FFAST_MATH)
+        check_c_compiler_flag(-march=x86-64-v3 HAVE_MARCH_X86_64_V3)
+
+        if(HAVE_MARCH_X86_64_V3)
+            # matrixmap.c: architecture flag only: lets GCC emit AVX2 blend
+            # instructions for the branchless diagonal-scale loop.  No
+            # -ffast-math here to avoid changing FP precision in InvertMatrix
+            # and other arithmetic that the test suite checks exactly.
+            list(APPEND AST_SIMD_MAT_FLAGS -march=x86-64-v3)
+        endif()
+
+        if(HAVE_FOPENMP_SIMD AND HAVE_FFAST_MATH AND HAVE_MARCH_X86_64_V3)
+            # sphmap.c: -fopenmp-simd makes #pragma omp simd dispatch atan2,
+            # sin, cos to libmvec vector variants.  -ffast-math is required
+            # for that dispatch.  -fno-associative-math is added back to avoid
+            # FMA-based reassociation that would change surrounding arithmetic.
+            list(APPEND AST_SIMD_SPH_FLAGS
+                -fopenmp-simd
+                -ffast-math
+                -fno-associative-math
+                -march=x86-64-v3
+            )
+            message(STATUS
+                "AST SIMD: GCC+libmvec trig vectorization enabled for sphmap.c "
+                "(-fopenmp-simd -ffast-math -fno-associative-math -march=x86-64-v3); "
+                "AVX2 blend loop enabled for matrixmap.c (-march=x86-64-v3)")
+        elseif(HAVE_MARCH_X86_64_V3)
+            message(STATUS
+                "AST SIMD: -fopenmp-simd or -ffast-math not available; "
+                "AVX2 matrixmap diagonal vectorization only (-march=x86-64-v3)")
+        else()
+            message(WARNING
+                "AST_ENABLE_SIMD is ON but no supported flags are available: "
+                "-fopenmp-simd=${HAVE_FOPENMP_SIMD} "
+                "-ffast-math=${HAVE_FFAST_MATH} "
+                "-march=x86-64-v3=${HAVE_MARCH_X86_64_V3}")
+        endif()
+    else()
+        message(WARNING
+            "AST_ENABLE_SIMD is ON but is only supported with GCC on glibc systems "
+            "(compiler: ${CMAKE_C_COMPILER_ID})")
     endif()
 endif()
 
@@ -791,6 +843,21 @@ set_target_properties(ast PROPERTIES
     C_STANDARD ${AST_C_STANDARD}
 )
 ast_apply_dev_options(ast)
+
+# Apply SIMD flags to specific source files only (not the whole library) so
+# that -ffast-math and -march= do not change the FP semantics of the rest of
+# libast. AST_HAVE_SIMD guards the restructured loops inside those files.
+if(AST_SIMD_SPH_FLAGS OR AST_SIMD_MAT_FLAGS)
+    if(AST_SIMD_SPH_FLAGS)
+        set_source_files_properties(src/sphmap.c
+            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPH_FLAGS}")
+    endif()
+    if(AST_SIMD_MAT_FLAGS)
+        set_source_files_properties(src/matrixmap.c
+            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_MAT_FLAGS}")
+    endif()
+    target_compile_definitions(ast PRIVATE AST_HAVE_SIMD=1)
+endif()
 
 # libast references symbols (astGFlush, astPutErr_, etc.) that are provided
 # by the satellite libraries (ast_err, ast_grf_*). These are intentionally
