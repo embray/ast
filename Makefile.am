@@ -33,7 +33,6 @@ GRP_C_ROUTINES = \
     src/lutmap.c \
     src/mapping.c \
     src/mathmap.c \
-    src/matrixmap.c \
     src/memory.c \
     src/moc.c \
     src/mocchan.c \
@@ -59,7 +58,6 @@ GRP_C_ROUTINES = \
     src/specfluxframe.c \
     src/specframe.c \
     src/specmap.c \
-    src/sphmap.c \
     src/splinemap.c \
     src/stc.c \
     src/stccatalogentrylocation.c \
@@ -748,15 +746,15 @@ libast_la_LDFLAGS = -version-info @version_info@
 # library instead. Do the same for cminpack
 if EXTERNAL_PAL
 if EXTERNAL_CMINPACK
-libast_la_LIBADD =  -lpal -lcminpack
+libast_la_LIBADD =  -lpal -lcminpack libast_sphmap.la libast_matrixmap.la
 else
-libast_la_LIBADD = -lpal libast_cminpack.la
+libast_la_LIBADD = -lpal libast_cminpack.la libast_sphmap.la libast_matrixmap.la
 endif
 else
 if EXTERNAL_CMINPACK
-libast_la_LIBADD =  libast_pal.la -lcminpack
+libast_la_LIBADD =  libast_pal.la -lcminpack libast_sphmap.la libast_matrixmap.la
 else
-libast_la_LIBADD = libast_pal.la libast_cminpack.la
+libast_la_LIBADD = libast_pal.la libast_cminpack.la libast_sphmap.la libast_matrixmap.la
 endif
 endif
 
@@ -960,7 +958,25 @@ sun211_figures: sun210_figures
 
 # Installation check
 
-noinst_LTLIBRARIES =
+# sphmap.c and matrixmap.c are always compiled as noinst convenience libraries
+# so that per-file SIMD flags (from configure --enable-simd) can be applied
+# without affecting the rest of libast.  When SIMD is not enabled,
+# AST_SIMD_SPHMAP_FLAGS and AST_SIMD_MATRIXMAP_FLAGS are empty strings.
+noinst_LTLIBRARIES = libast_sphmap.la libast_matrixmap.la
+
+libast_sphmap_la_SOURCES = src/sphmap.c
+if !NOPIC
+libast_sphmap_la_CFLAGS = $(AM_CFLAGS) -prefer-pic $(threadsafe) $(yaml) @AST_SIMD_SPHMAP_FLAGS@
+else
+libast_sphmap_la_CFLAGS = $(AM_CFLAGS) $(threadsafe) $(yaml) @AST_SIMD_SPHMAP_FLAGS@
+endif
+
+libast_matrixmap_la_SOURCES = src/matrixmap.c
+if !NOPIC
+libast_matrixmap_la_CFLAGS = $(AM_CFLAGS) -prefer-pic $(threadsafe) $(yaml) @AST_SIMD_MATRIXMAP_FLAGS@
+else
+libast_matrixmap_la_CFLAGS = $(AM_CFLAGS) $(threadsafe) $(yaml) @AST_SIMD_MATRIXMAP_FLAGS@
+endif
 
 test: install
 	cd ast_tester && STARLINK=@STARLINK@ PGPLOT_DIR=@STARLINK@/bin FFLAGS="@STAR_FFLAGS_TEST@" ./ast_tester -nd

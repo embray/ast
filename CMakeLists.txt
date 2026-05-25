@@ -129,8 +129,8 @@ if(AST_ENABLE_COVERAGE)
     endif()
 endif()
 
-set(AST_SIMD_SPH_FLAGS)   # sphmap.c: trig vectorization via libmvec
-set(AST_SIMD_MAT_FLAGS)   # matrixmap.c: AVX2 auto-vec (no fast-math)
+set(AST_SIMD_SPHMAP_FLAGS)     # sphmap.c: trig vectorization via libmvec
+set(AST_SIMD_MATRIXMAP_FLAGS)  # matrixmap.c: AVX2 auto-vec (no fast-math)
 
 if(AST_ENABLE_SIMD)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
@@ -143,7 +143,7 @@ if(AST_ENABLE_SIMD)
             # instructions for the branchless diagonal-scale loop.  No
             # -ffast-math here to avoid changing FP precision in InvertMatrix
             # and other arithmetic that the test suite checks exactly.
-            list(APPEND AST_SIMD_MAT_FLAGS -march=x86-64-v3)
+            list(APPEND AST_SIMD_MATRIXMAP_FLAGS -march=x86-64-v3)
         endif()
 
         if(HAVE_FOPENMP_SIMD AND HAVE_FFAST_MATH AND HAVE_MARCH_X86_64_V3)
@@ -151,7 +151,7 @@ if(AST_ENABLE_SIMD)
             # sin, cos to libmvec vector variants.  -ffast-math is required
             # for that dispatch.  -fno-associative-math is added back to avoid
             # FMA-based reassociation that would change surrounding arithmetic.
-            list(APPEND AST_SIMD_SPH_FLAGS
+            list(APPEND AST_SIMD_SPHMAP_FLAGS
                 -fopenmp-simd
                 -ffast-math
                 -fno-associative-math
@@ -847,14 +847,14 @@ ast_apply_dev_options(ast)
 # Apply SIMD flags to specific source files only (not the whole library) so
 # that -ffast-math and -march= do not change the FP semantics of the rest of
 # libast. AST_HAVE_SIMD guards the restructured loops inside those files.
-if(AST_SIMD_SPH_FLAGS OR AST_SIMD_MAT_FLAGS)
-    if(AST_SIMD_SPH_FLAGS)
+if(AST_SIMD_SPHMAP_FLAGS OR AST_SIMD_MATRIXMAP_FLAGS)
+    if(AST_SIMD_SPHMAP_FLAGS)
         set_source_files_properties(src/sphmap.c
-            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPH_FLAGS}")
+            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPHMAP_FLAGS}")
     endif()
-    if(AST_SIMD_MAT_FLAGS)
+    if(AST_SIMD_MATRIXMAP_FLAGS)
         set_source_files_properties(src/matrixmap.c
-            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_MAT_FLAGS}")
+            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_MATRIXMAP_FLAGS}")
     endif()
     target_compile_definitions(ast PRIVATE AST_HAVE_SIMD=1)
 endif()
