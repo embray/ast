@@ -192,6 +192,10 @@ f     The MatrixMap class does not define any new routines beyond those
 *        astMtrGet now has option to return the expanded matrix.
 *     14-AUG-2020 (DSB):
 *        Added argument "order" to astMtrEuler.
+*     25-MAY-2026 (EMB):
+*        Add AST_HAVE_SIMD branchless indexed loop for the DIAGONAL matrix
+*        scale path in Transform, allowing GCC to emit a vectorised blend
+*        loop (VBLENDVPD) without altering results for AST__BAD values.
 *class--
 */
 
@@ -5236,6 +5240,15 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                indata = ptr_in[ out_coord ];
 
                if( diag_term != AST__BAD ){
+#ifdef AST_HAVE_SIMD
+/* Indexed form with branchless select lets GCC emit a vectorised blend
+   loop (VBLENDVPD on AVX2) without changing results for bad values. */
+                  for( point = 0; point < npoint; point++ ){
+                     val = indata[ point ];
+                     outdata[ point ] = ( val != AST__BAD ) ? diag_term*val
+                                                             : AST__BAD;
+                  }
+#else
                   for( point = 0; point < npoint; point++ ){
                      val = *(indata++);
                      if( val != AST__BAD ){
@@ -5244,6 +5257,7 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                         *(outdata++) = AST__BAD;
                      }
                   }
+#endif
 
                } else {
                   for( point = 0; point < npoint; point++ ){

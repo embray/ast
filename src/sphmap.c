@@ -85,6 +85,14 @@ f     The SphMap class does not define any new routines beyond those
 *        Avoid modifying the attributes of the existing SphMap in
 *        MapMerge, since it may be in use in other contexts. Modify a
 *        copy instead.
+*     8-MAY-20206 (DSB):
+*        Fix bug in MapMerge - UnitMap that replaces back to back SphMaps
+*        was not taking account of the direction of the two SphMaps.
+*     25-MAY-2026 (EMB):
+*        Add AST_HAVE_SIMD two-pass vectorised path in Transform: inlined
+*        atan2/sqrt (forward) and sin/cos (inverse) with #pragma omp simd
+*        so GCC routes them through libmvec, followed by a scalar fixup
+*        pass for bad values and poles.
 *class--
 */
 
@@ -123,6 +131,7 @@ f     The SphMap class does not define any new routines beyond those
 /* C header files. */
 /* --------------- */
 #include <float.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -1229,6 +1238,54 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
          q1 = ptr_out[ 1 ];
 
 /* Apply the mapping to every point. */
+#ifdef AST_HAVE_SIMD
+
+/* Use vectorised path only for batches large enough for libmvec to engage
+   (N < 8 falls back to scalar to preserve bit-exact agreement with
+   single-point calls that other mappers may make internally). */
+      if( npoint >= 8 ) {
+
+/* Two-pass approach: vectorised atan2/sqrt via libmvec on all points,
+   then a scalar fixup for bad inputs and poles.
+
+   Speculative trig on all N points.  The results for bad-value
+   and polar inputs are meaningless but are overwritten in pass 2.
+   #pragma omp simd lets GCC route atan2/sqrt to libmvec vector variants. */
+         #pragma omp simd
+         for( point = 0; point < npoint; point++ ) {
+            double x = p0[ point ];
+            double y = p1[ point ];
+            double z = p2[ point ];
+            double d2 = x*x + y*y;
+            q0[ point ] = atan2( y, x );
+            q1[ point ] = atan2( z, sqrt( d2 ) );
+         }
+
+/* Scalar fixup for bad inputs and poles (same as the non-SIMD case). */
+         for( point = 0; point < npoint; point++ ) {
+            if( p0[ point ] == AST__BAD || p1[ point ] == AST__BAD ||
+                p2[ point ] == AST__BAD ) {
+               q0[ point ] = AST__BAD;
+               q1[ point ] = AST__BAD;
+            } else {
+               mxerr = fabs( 1000.0*p2[ point ] )*DBL_EPSILON;
+               if( fabs( p0[ point ] ) < mxerr && fabs( p1[ point ] ) < mxerr ) {
+                  if( p2[ point ] < 0.0 ) {
+                     q0[ point ] = polarlong;
+                     q1[ point ] = -AST__DPIBY2;
+                  } else if( p2[ point ] > 0.0 ) {
+                     q0[ point ] = polarlong;
+                     q1[ point ] = AST__DPIBY2;
+                  } else {
+                     q0[ point ] = AST__BAD;
+                     q1[ point ] = AST__BAD;
+                  }
+               }
+            }
+         }
+
+      } else {
+#endif
          for( point = 0; point < npoint; point++ ){
             if( *p0 != AST__BAD && *p1 != AST__BAD && *p2 != AST__BAD ){
                v[0] = *p0;
@@ -1263,6 +1320,9 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
             p1++;
             p2++;
          }
+#ifdef AST_HAVE_SIMD
+      }
+#endif
 
 /* Now deal with inverse mappings from Spherical to Cartesian. */
       } else {
@@ -1277,6 +1337,34 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
          p2 = ptr_out[ 2 ];
 
 /* Apply the mapping to every point. */
+#ifdef AST_HAVE_SIMD
+      if( npoint >= 8 ) {
+
+/* Two-pass approach: vectorised sin/cos via libmvec on all N points,
+   then a scalar fixup for bad inputs.
+
+   First pass: speculative sin/cos on all points. */
+         #pragma omp simd
+         for( point = 0; point < npoint; point++ ) {
+            double theta = q0[ point ];
+            double phi   = q1[ point ];
+            double cp = cos( phi );
+            p0[ point ] = cos( theta ) * cp;
+            p1[ point ] = sin( theta ) * cp;
+            p2[ point ] = sin( phi );
+         }
+
+/* Overwrite outputs for bad inputs (same as non-SIMD case). */
+         for( point = 0; point < npoint; point++ ) {
+            if( q0[ point ] == AST__BAD || q1[ point ] == AST__BAD ) {
+               p0[ point ] = AST__BAD;
+               p1[ point ] = AST__BAD;
+               p2[ point ] = AST__BAD;
+            }
+         }
+
+      } else {
+#endif
          for( point = 0; point < npoint; point++ ){
             if( *q0 != AST__BAD && *q1 != AST__BAD ){
                palDcs2c( *q0, *q1, v );
@@ -1292,6 +1380,9 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
             q0++;
             q1++;
          }
+#ifdef AST_HAVE_SIMD
+      }
+#endif
 
       }
 
