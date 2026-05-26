@@ -129,22 +129,13 @@ if(AST_ENABLE_COVERAGE)
     endif()
 endif()
 
-set(AST_SIMD_SPHMAP_FLAGS)     # sphmap.c: trig vectorization via libmvec
-set(AST_SIMD_MATRIXMAP_FLAGS)  # matrixmap.c: AVX2 auto-vec (no fast-math)
+set(AST_SIMD_SPHMAP_FLAGS)  # sphmap.c: trig vectorization via libmvec
 
 if(AST_ENABLE_SIMD)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
         check_c_compiler_flag(-fopenmp-simd    HAVE_FOPENMP_SIMD)
         check_c_compiler_flag(-ffast-math      HAVE_FFAST_MATH)
         check_c_compiler_flag(-march=x86-64-v3 HAVE_MARCH_X86_64_V3)
-
-        if(HAVE_MARCH_X86_64_V3)
-            # matrixmap.c: architecture flag only: lets GCC emit AVX2 blend
-            # instructions for the branchless diagonal-scale loop.  No
-            # -ffast-math here to avoid changing FP precision in InvertMatrix
-            # and other arithmetic that the test suite checks exactly.
-            list(APPEND AST_SIMD_MATRIXMAP_FLAGS -march=x86-64-v3)
-        endif()
 
         if(HAVE_FOPENMP_SIMD AND HAVE_FFAST_MATH AND HAVE_MARCH_X86_64_V3)
             # sphmap.c: -fopenmp-simd makes #pragma omp simd dispatch atan2,
@@ -159,12 +150,7 @@ if(AST_ENABLE_SIMD)
             )
             message(STATUS
                 "AST SIMD: GCC+libmvec trig vectorization enabled for sphmap.c "
-                "(-fopenmp-simd -ffast-math -fno-associative-math -march=x86-64-v3); "
-                "AVX2 blend loop enabled for matrixmap.c (-march=x86-64-v3)")
-        elseif(HAVE_MARCH_X86_64_V3)
-            message(STATUS
-                "AST SIMD: -fopenmp-simd or -ffast-math not available; "
-                "AVX2 matrixmap diagonal vectorization only (-march=x86-64-v3)")
+                "(-fopenmp-simd -ffast-math -fno-associative-math -march=x86-64-v3)")
         else()
             message(WARNING
                 "AST_ENABLE_SIMD is ON but no supported flags are available: "
@@ -847,15 +833,9 @@ ast_apply_dev_options(ast)
 # Apply SIMD flags to specific source files only (not the whole library) so
 # that -ffast-math and -march= do not change the FP semantics of the rest of
 # libast. AST_HAVE_SIMD guards the restructured loops inside those files.
-if(AST_SIMD_SPHMAP_FLAGS OR AST_SIMD_MATRIXMAP_FLAGS)
-    if(AST_SIMD_SPHMAP_FLAGS)
-        set_source_files_properties(src/sphmap.c
-            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPHMAP_FLAGS}")
-    endif()
-    if(AST_SIMD_MATRIXMAP_FLAGS)
-        set_source_files_properties(src/matrixmap.c
-            PROPERTIES COMPILE_OPTIONS "${AST_SIMD_MATRIXMAP_FLAGS}")
-    endif()
+if(AST_SIMD_SPHMAP_FLAGS)
+    set_source_files_properties(src/sphmap.c
+        PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPHMAP_FLAGS}")
     target_compile_definitions(ast PRIVATE AST_HAVE_SIMD=1)
 endif()
 
