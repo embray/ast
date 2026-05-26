@@ -34,7 +34,7 @@ option(AST_WITH_MEMDEBUG "Enable AST memory leak debugging" OFF)
 option(AST_ENABLE_WARNINGS "Enable extra compiler warnings for development builds" OFF)
 option(AST_ENABLE_SANITIZERS "Enable address/undefined sanitizers for supported compilers" OFF)
 option(AST_ENABLE_COVERAGE "Enable compiler coverage instrumentation for supported compilers" OFF)
-option(AST_ENABLE_SIMD "Enable SIMD/vectorization via GCC+glibc libmvec (sphmap, matrixmap)" OFF)
+option(AST_ENABLE_SIMD "Enable SIMD/vectorization via GCC+glibc libmvec (sphmap, polymap)" OFF)
 option(AST_ENABLE_HUGE_TEST "Build the huge manual stress test converted from testhuge.f" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_TESTING "Build the test program" ON)
@@ -129,7 +129,7 @@ if(AST_ENABLE_COVERAGE)
     endif()
 endif()
 
-set(AST_SIMD_SPHMAP_FLAGS)  # sphmap.c: trig vectorization via libmvec
+set(AST_SIMD_FLAGS)  # per-file flags for SIMD-vectorized source files
 
 if(AST_ENABLE_SIMD)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
@@ -138,22 +138,22 @@ if(AST_ENABLE_SIMD)
         check_c_compiler_flag(-march=x86-64-v3 HAVE_MARCH_X86_64_V3)
 
         if(HAVE_FOPENMP_SIMD AND HAVE_FFAST_MATH AND HAVE_MARCH_X86_64_V3)
-            # sphmap.c: -fopenmp-simd makes #pragma omp simd dispatch atan2,
-            # sin, cos to libmvec vector variants.  -ffast-math is required
-            # for that dispatch.  -fno-associative-math is added back to avoid
-            # FMA-based reassociation that would change surrounding arithmetic.
-            list(APPEND AST_SIMD_SPHMAP_FLAGS
+            # -fopenmp-simd enables #pragma omp simd; -ffast-math is required
+            # for libmvec trig dispatch (sphmap.c) and improves vectorization
+            # of arithmetic loops (polymap.c).  -fno-associative-math is added
+            # back to avoid FMA-based reassociation changing other arithmetic.
+            list(APPEND AST_SIMD_FLAGS
                 -fopenmp-simd
                 -ffast-math
                 -fno-associative-math
                 -march=x86-64-v3
             )
             message(STATUS
-                "AST SIMD: GCC+libmvec trig vectorization enabled for sphmap.c "
+                "AST SIMD: GCC+libmvec vectorization enabled for sphmap.c, polymap.c "
                 "(-fopenmp-simd -ffast-math -fno-associative-math -march=x86-64-v3)")
         else()
             message(WARNING
-                "AST_ENABLE_SIMD is ON but no supported flags are available: "
+                "AST_ENABLE_SIMD is ON but required flags are not available: "
                 "-fopenmp-simd=${HAVE_FOPENMP_SIMD} "
                 "-ffast-math=${HAVE_FFAST_MATH} "
                 "-march=x86-64-v3=${HAVE_MARCH_X86_64_V3}")
@@ -833,9 +833,9 @@ ast_apply_dev_options(ast)
 # Apply SIMD flags to specific source files only (not the whole library) so
 # that -ffast-math and -march= do not change the FP semantics of the rest of
 # libast. AST_HAVE_SIMD guards the restructured loops inside those files.
-if(AST_SIMD_SPHMAP_FLAGS)
-    set_source_files_properties(src/sphmap.c
-        PROPERTIES COMPILE_OPTIONS "${AST_SIMD_SPHMAP_FLAGS}")
+if(AST_SIMD_FLAGS)
+    set_source_files_properties(src/sphmap.c src/polymap.c
+        PROPERTIES COMPILE_OPTIONS "${AST_SIMD_FLAGS}")
     target_compile_definitions(ast PRIVATE AST_HAVE_SIMD=1)
 endif()
 

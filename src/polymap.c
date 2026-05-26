@@ -151,6 +151,13 @@ f     - AST_POLYTRAN: Fit a PolyMap inverse or forward transformation
 *     28-JUL-2025 (DSB):
 *        - Add protected virtual method astMergeShift.
 *        - Add public static method astShowPoly.
+*     26-MAY-2026 (EMB):
+*        Add AST_HAVE_SIMD TransformSIMD: inverted loop order over points
+*        so innermost loops are independent and GCC emits VMULPD/VADDPD
+*        via #pragma omp simd, followed by a scalar fixup pass for bad
+*        values.  Wired into the vtab in place of Transform when
+*        AST_HAVE_SIMD is defined; falls back to scalar Transform for
+*        subclasses that override PolyPowers (e.g. ChebyMap).
 *class--
 */
 
@@ -257,6 +264,9 @@ AstPolyMap *astPolyMapId_( int, int, int, const double[], int, const double[], c
 /* ======================================== */
 static AstMapping *LinearGuess( AstPolyMap *, int * );
 static AstPointSet *Transform( AstMapping *, AstPointSet *, int, AstPointSet *, int * );
+#ifdef AST_HAVE_SIMD
+static AstPointSet *TransformSIMD( AstMapping *, AstPointSet *, int, AstPointSet *, int * );
+#endif
 static AstPolyMap **GetJacobian( AstPolyMap *, int * );
 static AstPolyMap *MergeShift( AstPolyMap *, AstShiftMap *, int, int, int * );
 static AstPolyMap *PolyTran( AstPolyMap *, int, double, double, int, const double *, const double *, int * );
@@ -2406,7 +2416,11 @@ void astInitPolyMapVtab_(  AstPolyMapVtab *vtab, const char *name, int *status )
    object->TestAttrib = TestAttrib;
 
    parent_transform = mapping->Transform;
+#ifdef AST_HAVE_SIMD
+   mapping->Transform = TransformSIMD;
+#else
    mapping->Transform = Transform;
+#endif
    mapping->GetTranForward = GetTranForward;
    mapping->GetTranInverse = GetTranInverse;
 
@@ -6226,6 +6240,247 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 /* Return a pointer to the output PointSet. */
    return result;
 }
+
+#ifdef AST_HAVE_SIMD
+static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
+                                   int forward, AstPointSet *out, int *status ) {
+/*
+*  Name:
+*     TransformSIMD
+
+*  Purpose:
+*     Apply a PolyMap to transform a set of points using SIMD-vectorised loops.
+
+*  Type:
+*     Private function.
+
+*  Synopsis:
+*     #include "polymap.h"
+*     AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
+*                                 int forward, AstPointSet *out, int *status )
+
+*  Class Membership:
+*     PolyMap member function.  Replaces Transform in the vtab when
+*     AST_HAVE_SIMD is defined.
+
+*  Description:
+*     Equivalent to Transform but restructures the polynomial evaluation
+*     so that the innermost loop iterates over points rather than over
+*     coordinates or coefficients.  The resulting loops are independent
+*     over points and GCC can vectorise them with #pragma omp simd,
+*     emitting AVX2 VMULPD instructions for power computation and VADDPD
+*     for accumulation.
+*
+*     Three-pass approach:
+*       Pass 1: for each input coordinate, compute work[coord][pow][point]
+*         = x_coord[point]^pow for all N points via repeated multiply.
+*       Pass 2: for each output coordinate, zero the output array then
+*         accumulate each polynomial term: initialise a per-point scratch
+*         buffer to the coefficient value, multiply in each power factor,
+*         then add to the output -- all with SIMD inner loops over points.
+*         A bad coefficient poisons the entire output coordinate (same
+*         semantics as the scalar Transform).
+*       Pass 3 (fixup): scalar pass that overwrites outputs with AST__BAD
+*         for any point where at least one input coordinate was AST__BAD.
+*
+*     Falls back to the scalar Transform for subclasses that override
+*     PolyPowers (e.g. ChebyMap), detected by comparing the vtab slot
+*     to PolyMap's own PolyPowers implementation.
+
+*  Parameters:
+*     As for Transform.
+
+*  Returned Value:
+*     Pointer to the output (possibly new) PointSet.
+*/
+
+/* Local Variables: */
+   AstPointSet *result;
+   AstPolyMap *map;
+   double ***work;        /* work[in_coord][pow] -> npoint doubles */
+   double **coeff;
+   double **ptr_in;
+   double **ptr_out;
+   double *outcof;        /* pointer to current coefficient value */
+   double *pout;          /* pointer to current output coord array */
+   double *term;          /* per-point scratch for term accumulation */
+   double *w0;            /* pointer to work[in_coord][0] */
+   double *wprev;         /* pointer to work[in_coord][pow-1] */
+   double *wp;            /* pointer to current work array (reused in pass 1 and 2) */
+   double *xvec;          /* pointer to current input coord array */
+   double c;              /* current coefficient value */
+   int ***power;
+   int **outpow;
+   int *mxpow;
+   int *ncoeff;
+   int bad;
+   int ico;
+   int in_coord;
+   int nc;
+   int ncoord_in;
+   int ncoord_out;
+   int npoint;
+   int npow;
+   int out_coord;
+   int point;
+   int pow;
+
+/* Check the global error status. */
+   if ( !astOK ) return NULL;
+
+/* If a subclass has overridden PolyPowers (e.g. ChebyMap), fall back to
+   the scalar Transform which uses virtual PolyPowers dispatch correctly. */
+   if( ((AstPolyMapVtab *) astVTAB( this ))->PolyPowers != PolyPowers ) {
+      return Transform( this, in, forward, out, status );
+   }
+
+   map = (AstPolyMap *) this;
+
+/* Validate arguments and create the output PointSet. */
+   result = (*parent_transform)( this, in, forward, out, status );
+
+/* Determine whether to apply the original forward or inverse mapping. */
+   if ( astGetInvert( map ) )
+      forward = !forward;
+
+/* Use the iterative inverse if requested. */
+   if( !forward && astGetIterInverse( map ) ) {
+      IterInverse( map, in, result, status );
+
+   } else {
+      ncoord_in = astGetNcoord( in );
+      ncoord_out = astGetNcoord( result );
+      npoint = astGetNpoint( in );
+      ptr_in = astGetPoints( in );
+      ptr_out = astGetPoints( result );
+
+      if( forward ) {
+         ncoeff = map->ncoeff_f;
+         coeff = map->coeff_f;
+         power = map->power_f;
+         mxpow = map->mxpow_f;
+      } else {
+         ncoeff = map->ncoeff_i;
+         coeff = map->coeff_i;
+         power = map->power_i;
+         mxpow = map->mxpow_i;
+      }
+
+/* Allocate work[in_coord][pow][0..npoint-1] and a per-point term buffer. */
+      work = astMalloc( sizeof(double **) * (size_t) ncoord_in );
+      term = astMalloc( sizeof(double) * (size_t) npoint );
+      if( astOK ) {
+         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+            npow = astMAX( 2, mxpow[ in_coord ] + 1 );
+            work[ in_coord ] = astMalloc( sizeof(double *) * (size_t) npow );
+            if( astOK ) {
+               for( pow = 0; pow < npow; pow++ )
+                  work[ in_coord ][ pow ] = astMalloc(
+                        sizeof(double) * (size_t) npoint );
+            }
+         }
+      }
+
+      if( astOK ) {
+
+/* Compute work[coord][pow][point] = x_coord[point]^pow.
+   Innermost loop over points is independent -- GCC vectorises. */
+         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+            w0 = work[ in_coord ][ 0 ];
+            xvec = ptr_in[ in_coord ];
+
+            #pragma omp simd
+            for( point = 0; point < npoint; point++ ) w0[ point ] = 1.0;
+
+            for( pow = 1; pow <= mxpow[ in_coord ]; pow++ ) {
+               wprev = work[ in_coord ][ pow - 1 ];
+               wp = work[ in_coord ][ pow ];
+               #pragma omp simd
+               for( point = 0; point < npoint; point++ )
+                  wp[ point ] = wprev[ point ] * xvec[ point ];
+            }
+         }
+
+/* For each output coordinate, accumulate all polynomial terms. */
+         for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+            pout = ptr_out[ out_coord ];
+            nc = ncoeff[ out_coord ];
+            outcof = coeff[ out_coord ];
+            outpow = power[ out_coord ];
+
+            #pragma omp simd
+            for( point = 0; point < npoint; point++ ) pout[ point ] = 0.0;
+
+            for( ico = 0; ico < nc; ico++, outcof++, outpow++ ) {
+               c = *outcof;
+
+               if( c == 0.0 ) continue;
+
+/* A bad coefficient poisons all outputs for this coordinate (same as
+   the scalar Transform). */
+               if( c == AST__BAD ) {
+                  #pragma omp simd
+                  for( point = 0; point < npoint; point++ )
+                     pout[ point ] = AST__BAD;
+                  break;
+               }
+
+/* Initialise per-point term to the coefficient value, then multiply in
+   each input power factor.  Each inner loop over points is independent. */
+               #pragma omp simd
+               for( point = 0; point < npoint; point++ ) term[ point ] = c;
+
+               for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                  pow = (*outpow)[ in_coord ];
+                  if( pow > 0 ) {
+                     wp = work[ in_coord ][ pow ];
+                     #pragma omp simd
+                     for( point = 0; point < npoint; point++ )
+                        term[ point ] *= wp[ point ];
+                  }
+               }
+
+               #pragma omp simd
+               for( point = 0; point < npoint; point++ )
+                  pout[ point ] += term[ point ];
+            }
+         }
+
+/* Fixup: for each point where any input coord is AST__BAD, overwrite all
+ * outputs with AST__BAD. */
+         for( point = 0; point < npoint; point++ ) {
+            bad = 0;
+            for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+               if( ptr_in[ in_coord ][ point ] == AST__BAD ) {
+                  bad = 1;
+                  break;
+               }
+            }
+            if( bad ) {
+               for( out_coord = 0; out_coord < ncoord_out; out_coord++ )
+                  ptr_out[ out_coord ][ point ] = AST__BAD;
+            }
+         }
+      }
+
+/* Free work arrays. */
+      term = astFree( term );
+      if( work ) {
+         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+            if( work[ in_coord ] ) {
+               npow = astMAX( 2, mxpow[ in_coord ] + 1 );
+               for( pow = 0; pow < npow; pow++ )
+                  work[ in_coord ][ pow ] = astFree( work[ in_coord ][ pow ] );
+               work[ in_coord ] = astFree( work[ in_coord ] );
+            }
+         }
+         work = astFree( work );
+      }
+   }
+
+   return result;
+}
+#endif /* AST_HAVE_SIMD */
 
 /* Functions which access class attributes. */
 /* ---------------------------------------- */
