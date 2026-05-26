@@ -47,7 +47,6 @@ GRP_C_ROUTINES = \
     src/pointlist.c \
     src/pointset.c \
     src/polygon.c \
-    src/polymap.c \
     src/prism.c \
     src/ratemap.c \
     src/region.c \
@@ -747,15 +746,15 @@ libast_la_LDFLAGS = -version-info @version_info@
 # library instead. Do the same for cminpack
 if EXTERNAL_PAL
 if EXTERNAL_CMINPACK
-libast_la_LIBADD =  -lpal -lcminpack libast_sphmap.la
+libast_la_LIBADD =  -lpal -lcminpack $(AST_MAYBE_SIMD_LIBS)
 else
-libast_la_LIBADD = -lpal libast_cminpack.la libast_sphmap.la
+libast_la_LIBADD = -lpal libast_cminpack.la $(AST_MAYBE_SIMD_LIBS)
 endif
 else
 if EXTERNAL_CMINPACK
-libast_la_LIBADD =  libast_pal.la -lcminpack libast_sphmap.la
+libast_la_LIBADD =  libast_pal.la -lcminpack $(AST_MAYBE_SIMD_LIBS)
 else
-libast_la_LIBADD = libast_pal.la libast_cminpack.la libast_sphmap.la
+libast_la_LIBADD = libast_pal.la libast_cminpack.la $(AST_MAYBE_SIMD_LIBS)
 endif
 endif
 
@@ -961,14 +960,20 @@ sun211_figures: sun210_figures
 
 # sphmap.c is compiled as a noinst convenience library so that per-file SIMD
 # flags (from configure --enable-simd) can be applied without affecting the
-# rest of libast.  When SIMD is not enabled, AST_SIMD_SPHMAP_FLAGS is empty.
-noinst_LTLIBRARIES = libast_sphmap.la
+# rest of libast.  When SIMD is not enabled, AST_SIMD_FLAGS is empty.
+# Likewise for polymap.c.
+AST_MAYBE_SIMD_LIBS = libast_sphmap.la libast_polymap.la
+noinst_LTLIBRARIES = $(AST_MAYBE_SIMD_LIBS)
 
+libast_polymap_la_SOURCES = src/polymap.c
 libast_sphmap_la_SOURCES = src/sphmap.c
+
 if !NOPIC
-libast_sphmap_la_CFLAGS = $(AM_CFLAGS) -prefer-pic $(threadsafe) $(yaml) @AST_SIMD_SPHMAP_FLAGS@
+libast_polymap_la_CFLAGS = $(AM_CFLAGS) -prefer-pic $(threadsafe) $(yaml) @AST_SIMD_FLAGS@
+libast_sphmap_la_CFLAGS = $(AM_CFLAGS) -prefer-pic $(threadsafe) $(yaml) @AST_SIMD_FLAGS@
 else
-libast_sphmap_la_CFLAGS = $(AM_CFLAGS) $(threadsafe) $(yaml) @AST_SIMD_SPHMAP_FLAGS@
+libast_polymap_la_CFLAGS = $(AM_CFLAGS) $(threadsafe) $(yaml) @AST_SIMD_FLAGS@
+libast_sphmap_la_CFLAGS = $(AM_CFLAGS) $(threadsafe) $(yaml) @AST_SIMD_FLAGS@
 endif
 
 test: install
