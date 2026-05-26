@@ -201,6 +201,31 @@ f     - AST_POLYTRAN: Fit a PolyMap inverse or forward transformation
 #include <string.h>
 #include <limits.h>
 #include <float.h>
+#ifdef AST_HAVE_SIMD
+#ifdef __x86_64__
+#include <cpuid.h> /* __cpuid_count -- GCC built-in on x86-64 */
+
+/* CPUID leaf 4 (Deterministic Cache Parameters) field extractors.
+   All three EBX fields and ECX are encoded as (actual_value - 1), so
+   each macro adds 1 to recover the true count. */
+#define CPUID4_CACHE_TYPE(eax) ( (eax) & 0x1f )
+#define CPUID4_CACHE_LEVEL(eax) ( ((eax) >> 5) & 0x7 )
+#define CPUID4_CACHE_TYPE_NULL 0   /* no more cache descriptors */
+#define CPUID4_CACHE_TYPE_DATA 1
+#define CPUID4_CACHE_TYPE_INSTR 2
+#define CPUID4_CACHE_TYPE_UNIFIED 3
+/* EBX[11:0]: cache line size in bytes, minus 1 */
+#define CPUID4_LINE_SIZE(ebx) ( (long)((ebx) & 0xfff) + 1L )
+/* EBX[21:12]: physical line partitions, minus 1 */
+#define CPUID4_PARTITIONS(ebx) ( (long)(((ebx) >> 12) & 0x3ff) + 1L )
+/* EBX[31:22]: ways of associativity, minus 1 */
+#define CPUID4_WAYS(ebx) ( (long)(((ebx) >> 22) & 0x3ff) + 1L )
+/* ECX: number of sets, minus 1 */
+#define CPUID4_SETS(ecx) ( (long)(ecx) + 1L )
+#endif
+
+#include <unistd.h> /* sysconf */
+#endif
 
 /* Module Variables. */
 /* ================= */
@@ -6242,6 +6267,93 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 }
 
 #ifdef AST_HAVE_SIMD
+
+static long DetectL2Capacity( void ) {
+/*
+*  Name:
+*     DetectL2Capacity
+
+*  Purpose:
+*     Return the size of the L2 data cache in bytes.
+
+*  Description:
+*     Queries the L2 cache size via CPUID (x86-64) if available, falling
+*     back to sysconf, and finally to a 512 KiB default.  Intended for
+*     use by SIMDChunkSize; not called directly.
+*/
+#ifdef __x86_64__
+   unsigned eax, ebx, ecx, edx, idx;
+   for( idx = 0; ; idx++ ) {
+      __cpuid_count( 4, idx, eax, ebx, ecx, edx );
+
+      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_NULL )
+         break;
+
+      if( CPUID4_CACHE_LEVEL( eax ) != 2 )
+         continue;
+
+      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_INSTR )
+         continue;
+
+      return CPUID4_WAYS( ebx ) * CPUID4_PARTITIONS( ebx )
+           * CPUID4_LINE_SIZE( ebx ) * CPUID4_SETS( ecx );
+   }
+#endif
+#ifdef _SC_LEVEL2_CACHE_SIZE
+   long sz = sysconf( _SC_LEVEL2_CACHE_SIZE );
+
+   if( sz > 0 )
+      return sz;
+#endif
+/* Fallback guess: 512KiB */
+   return 512L * 1024L;
+}
+
+
+static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
+/*
+*  Name:
+*     SIMDChunkSize
+
+*  Purpose:
+*     Return the number of points to process per SIMD chunk in TransformSIMD.
+
+*  Description:
+*     Computes a chunk size that keeps the work and term buffers within half
+*     the L2 cache, so the hot data stays cache-resident across passes.
+*     The L2 size is detected once and stored in a static variable.
+
+*  Parameters:
+*     ncoord_in
+*        Number of input coordinates.
+*     max_mxpow
+*        Maximum polynomial power across all input coordinates.
+
+*  Returned Value:
+*     Chunk size in points, clamped to [64, 65536].
+*/
+   static long l2_cap = 0;
+   long bytes_per_point;
+   int chunk;
+
+   if( l2_cap == 0 )
+      l2_cap = DetectL2Capacity();
+
+/* work[ncoord_in][max_mxpow+1][chunk] doubles + term[chunk] doubles. */
+   bytes_per_point = ( (long)ncoord_in * ( max_mxpow + 1 ) + 1L )
+                     * (long)sizeof(double);
+   chunk = (int)( l2_cap / 2L / bytes_per_point );
+
+   if( chunk < 64 )
+      chunk = 64;
+
+   if( chunk > 65536 )
+      chunk = 65536;
+
+   return chunk;
+}
+
+
 static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
                                    int forward, AstPointSet *out, int *status ) {
 /*
@@ -6314,8 +6426,12 @@ static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
    int *mxpow;
    int *ncoeff;
    int bad;
+   int chunk_n;           /* number of points in current chunk */
+   int chunk_size;        /* target chunk size from SIMDChunkSize */
+   int chunk_start;       /* index of first point in current chunk */
    int ico;
    int in_coord;
+   int max_mxpow;         /* max over input coords of mxpow[in_coord] */
    int nc;
    int ncoord_in;
    int ncoord_out;
@@ -6366,9 +6482,21 @@ static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
          mxpow = map->mxpow_i;
       }
 
-/* Allocate work[in_coord][pow][0..npoint-1] and a per-point term buffer. */
+/* Compute the maximum power across all input coordinates, used to size
+   work arrays and to derive the SIMD chunk size. */
+      max_mxpow = 0;
+      for( in_coord = 0; in_coord < ncoord_in; in_coord++ )
+         if( mxpow[ in_coord ] > max_mxpow ) max_mxpow = mxpow[ in_coord ];
+
+/* Choose a chunk size that keeps work + term buffers within half the L2
+   cache, avoiding the memory-pressure regression seen at large N when
+   allocating npoint-sized arrays. */
+      chunk_size = SIMDChunkSize( ncoord_in, max_mxpow );
+
+/* Allocate work[in_coord][pow][0..chunk_size-1] and a term buffer, both
+   sized to chunk_size rather than npoint. */
       work = astMalloc( sizeof(double **) * (size_t) ncoord_in );
-      term = astMalloc( sizeof(double) * (size_t) npoint );
+      term = astMalloc( sizeof(double) * (size_t) chunk_size );
       if( astOK ) {
          for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
             npow = astMAX( 2, mxpow[ in_coord ] + 1 );
@@ -6376,89 +6504,105 @@ static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
             if( astOK ) {
                for( pow = 0; pow < npow; pow++ )
                   work[ in_coord ][ pow ] = astMalloc(
-                        sizeof(double) * (size_t) npoint );
+                        sizeof(double) * (size_t) chunk_size );
             }
          }
       }
 
       if( astOK ) {
 
+/* Process points in chunks of chunk_size so that work + term stay
+   resident in L2 cache across all three passes. */
+         for( chunk_start = 0; chunk_start < npoint; chunk_start += chunk_size ) {
+            chunk_n = npoint - chunk_start;
+
+            if( chunk_n > chunk_size )
+               chunk_n = chunk_size;
+
 /* Compute work[coord][pow][point] = x_coord[point]^pow.
    Innermost loop over points is independent -- GCC vectorises. */
-         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-            w0 = work[ in_coord ][ 0 ];
-            xvec = ptr_in[ in_coord ];
+            for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+               w0 = work[ in_coord ][ 0 ];
+               xvec = ptr_in[ in_coord ] + chunk_start;
 
-            #pragma omp simd
-            for( point = 0; point < npoint; point++ ) w0[ point ] = 1.0;
-
-            for( pow = 1; pow <= mxpow[ in_coord ]; pow++ ) {
-               wprev = work[ in_coord ][ pow - 1 ];
-               wp = work[ in_coord ][ pow ];
                #pragma omp simd
-               for( point = 0; point < npoint; point++ )
-                  wp[ point ] = wprev[ point ] * xvec[ point ];
+               for( point = 0; point < chunk_n; point++ ) w0[ point ] = 1.0;
+
+               for( pow = 1; pow <= mxpow[ in_coord ]; pow++ ) {
+                  wprev = work[ in_coord ][ pow - 1 ];
+                  wp = work[ in_coord ][ pow ];
+
+                  #pragma omp simd
+                  for( point = 0; point < chunk_n; point++ )
+                     wp[ point ] = wprev[ point ] * xvec[ point ];
+               }
             }
-         }
 
 /* For each output coordinate, accumulate all polynomial terms. */
-         for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
-            pout = ptr_out[ out_coord ];
-            nc = ncoeff[ out_coord ];
-            outcof = coeff[ out_coord ];
-            outpow = power[ out_coord ];
+            for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+               pout = ptr_out[ out_coord ] + chunk_start;
+               nc = ncoeff[ out_coord ];
+               outcof = coeff[ out_coord ];
+               outpow = power[ out_coord ];
 
-            #pragma omp simd
-            for( point = 0; point < npoint; point++ ) pout[ point ] = 0.0;
+               #pragma omp simd
+               for( point = 0; point < chunk_n; point++ )
+                  pout[ point ] = 0.0;
 
-            for( ico = 0; ico < nc; ico++, outcof++, outpow++ ) {
-               c = *outcof;
+               for( ico = 0; ico < nc; ico++, outcof++, outpow++ ) {
+                  c = *outcof;
 
-               if( c == 0.0 ) continue;
+                  if( c == 0.0 ) continue;
 
 /* A bad coefficient poisons all outputs for this coordinate (same as
    the scalar Transform). */
-               if( c == AST__BAD ) {
-                  #pragma omp simd
-                  for( point = 0; point < npoint; point++ )
-                     pout[ point ] = AST__BAD;
-                  break;
-               }
+                  if( c == AST__BAD ) {
+                     #pragma omp simd
+                     for( point = 0; point < chunk_n; point++ )
+                        pout[ point ] = AST__BAD;
+
+                     break;
+                  }
 
 /* Initialise per-point term to the coefficient value, then multiply in
    each input power factor.  Each inner loop over points is independent. */
-               #pragma omp simd
-               for( point = 0; point < npoint; point++ ) term[ point ] = c;
+                  #pragma omp simd
+                  for( point = 0; point < chunk_n; point++ )
+                     term[ point ] = c;
+
+                  for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                     pow = (*outpow)[ in_coord ];
+                     if( pow > 0 ) {
+                        wp = work[ in_coord ][ pow ];
+
+                        #pragma omp simd
+                        for( point = 0; point < chunk_n; point++ )
+                           term[ point ] *= wp[ point ];
+                     }
+                  }
+
+                  #pragma omp simd
+                  for( point = 0; point < chunk_n; point++ )
+                     pout[ point ] += term[ point ];
+               }
+            }
+
+/* Fixup -- for each point where any input coord is AST__BAD, overwrite all
+ * outputs with AST__BAD. */
+            for( point = 0; point < chunk_n; point++ ) {
+               bad = 0;
 
                for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-                  pow = (*outpow)[ in_coord ];
-                  if( pow > 0 ) {
-                     wp = work[ in_coord ][ pow ];
-                     #pragma omp simd
-                     for( point = 0; point < npoint; point++ )
-                        term[ point ] *= wp[ point ];
+                  if( ptr_in[ in_coord ][ chunk_start + point ] == AST__BAD ) {
+                     bad = 1;
+                     break;
                   }
                }
 
-               #pragma omp simd
-               for( point = 0; point < npoint; point++ )
-                  pout[ point ] += term[ point ];
-            }
-         }
-
-/* Fixup: for each point where any input coord is AST__BAD, overwrite all
- * outputs with AST__BAD. */
-         for( point = 0; point < npoint; point++ ) {
-            bad = 0;
-            for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-               if( ptr_in[ in_coord ][ point ] == AST__BAD ) {
-                  bad = 1;
-                  break;
+               if( bad ) {
+                  for( out_coord = 0; out_coord < ncoord_out; out_coord++ )
+                     ptr_out[ out_coord ][ chunk_start + point ] = AST__BAD;
                }
-            }
-            if( bad ) {
-               for( out_coord = 0; out_coord < ncoord_out; out_coord++ )
-                  ptr_out[ out_coord ][ point ] = AST__BAD;
             }
          }
       }
