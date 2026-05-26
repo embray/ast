@@ -5240,15 +5240,6 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                indata = ptr_in[ out_coord ];
 
                if( diag_term != AST__BAD ){
-#ifdef AST_HAVE_SIMD
-/* Indexed form with branchless select lets GCC emit a vectorised blend
-   loop (VBLENDVPD on AVX2) without changing results for bad values. */
-                  for( point = 0; point < npoint; point++ ){
-                     val = indata[ point ];
-                     outdata[ point ] = ( val != AST__BAD ) ? diag_term*val
-                                                             : AST__BAD;
-                  }
-#else
                   for( point = 0; point < npoint; point++ ){
                      val = *(indata++);
                      if( val != AST__BAD ){
@@ -5257,7 +5248,6 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                         *(outdata++) = AST__BAD;
                      }
                   }
-#endif
 
                } else {
                   for( point = 0; point < npoint; point++ ){

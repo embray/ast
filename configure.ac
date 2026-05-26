@@ -233,7 +233,6 @@ AC_ARG_ENABLE([simd],
     [enable_simd=no])
 
 AST_SIMD_SPHMAP_FLAGS=
-AST_SIMD_MATRIXMAP_FLAGS=
 if test "x$enable_simd" = "xyes"; then
     if test "x$GCC" = "xyes"; then
         ast_simd_have_sph=yes
@@ -261,22 +260,18 @@ if test "x$enable_simd" = "xyes"; then
         CFLAGS="$CFLAGS -march=x86-64-v3"
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
             [ast_have_march=yes],
-            [ast_have_march=no])
+            [ast_have_march=no; ast_simd_have_sph=no])
         CFLAGS=$ast_save_CFLAGS
         AC_MSG_RESULT([$ast_have_march])
 
-        if test "x$ast_have_march" = "xyes"; then
-            AST_SIMD_MATRIXMAP_FLAGS="-march=x86-64-v3"
-        fi
-        if test "x$ast_simd_have_sph" = "xyes" && \
-           test "x$ast_have_march" = "xyes"; then
+        if test "x$ast_simd_have_sph" = "xyes"; then
             AST_SIMD_SPHMAP_FLAGS="-fopenmp-simd -ffast-math -fno-associative-math -march=x86-64-v3"
         fi
 
-        if test -n "$AST_SIMD_SPHMAP_FLAGS" || test -n "$AST_SIMD_MATRIXMAP_FLAGS"; then
+        if test -n "$AST_SIMD_SPHMAP_FLAGS"; then
             AC_DEFINE([AST_HAVE_SIMD], [1],
-                [Define to 1 if SIMD vectorization is enabled for sphmap/matrixmap])
-            AC_MSG_NOTICE([AST SIMD: sphmap.c="$AST_SIMD_SPHMAP_FLAGS" matrixmap.c="$AST_SIMD_MATRIXMAP_FLAGS"])
+                [Define to 1 if SIMD vectorization is enabled for sphmap])
+            AC_MSG_NOTICE([AST SIMD: sphmap.c="$AST_SIMD_SPHMAP_FLAGS"])
         else
             AC_MSG_WARN([--enable-simd: no supported flags available; SIMD not active])
         fi
@@ -285,7 +280,6 @@ if test "x$enable_simd" = "xyes"; then
     fi
 fi
 AC_SUBST([AST_SIMD_SPHMAP_FLAGS])
-AC_SUBST([AST_SIMD_MATRIXMAP_FLAGS])
 
 # See which variadic function API to use
 AC_CHECK_HEADERS(stdarg.h varargs.h, break)
