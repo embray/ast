@@ -193,9 +193,19 @@ f     The MatrixMap class does not define any new routines beyond those
 *     14-AUG-2020 (DSB):
 *        Added argument "order" to astMtrEuler.
 *     25-MAY-2026 (EMB):
-*        Add AST_HAVE_SIMD branchless indexed loop for the DIAGONAL matrix
-*        scale path in Transform, allowing GCC to emit a vectorised blend
-*        loop (VBLENDVPD) without altering results for AST__BAD values.
+*        Add AST_HAVE_SIMD branchless blend for the DIAGONAL matrix scale
+*        path in Transform (VCMPPD + VBLENDVPD + VMULPD, no branch).
+*        Add AST_HAVE_SIMD two-pass vectorised path for the FULL matrix
+*        Transform: accumulate M[out][in]*in[in][point] with coord-outer /
+*        point-inner loops (#pragma omp simd), then a scalar fixup pass for
+*        AST__BAD inputs.  Falls back to the scalar path when any matrix
+*        element is AST__BAD.
+*     27-MAY-2026 (EMB):
+*        Add L2-aware chunking to the FULL SIMD path (DetectL2CapacityMM /
+*        MatrixChunkSize, mirroring the PolyMap approach).  Process points
+*        in chunks sized so that (ncoord_in + ncoord_out)*chunk doubles fit
+*        in L2/2, keeping pin/pout sub-arrays cache-resident across all
+*        coord-pair passes and eliminating excess DRAM traffic at large N.
 *class--
 */
 
@@ -245,6 +255,20 @@ f     The MatrixMap class does not define any new routines beyond those
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef AST_HAVE_SIMD
+#ifdef __x86_64__
+#include <cpuid.h>
+#define CPUID4_CACHE_TYPE(eax)  ( (eax) & 0x1f )
+#define CPUID4_CACHE_LEVEL(eax) ( ((eax) >> 5) & 0x7 )
+#define CPUID4_CACHE_TYPE_NULL     0
+#define CPUID4_CACHE_TYPE_INSTR    2
+#define CPUID4_LINE_SIZE(ebx)   ( (long)((ebx) & 0xfff) + 1L )
+#define CPUID4_PARTITIONS(ebx)  ( (long)(((ebx) >> 12) & 0x3ff) + 1L )
+#define CPUID4_WAYS(ebx)        ( (long)(((ebx) >> 22) & 0x3ff) + 1L )
+#define CPUID4_SETS(ecx)        ( (long)(ecx) + 1L )
+#endif
+#endif
 
 /* Module Variables. */
 /* ================= */
@@ -5041,6 +5065,47 @@ static int GetTranInverse( AstMapping *this, int *status ) {
 
 }
 
+#ifdef AST_HAVE_SIMD
+static long DetectL2CapacityMM( void ) {
+/* Return the L2 data cache size in bytes (CPUID on x86-64, sysconf fallback,
+   then 512 KiB default).  Mirrors DetectL2Capacity in polymap.c. */
+#ifdef __x86_64__
+   unsigned eax, ebx, ecx, edx, idx;
+   for( idx = 0; ; idx++ ) {
+      __cpuid_count( 4, idx, eax, ebx, ecx, edx );
+      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_NULL ) break;
+      if( CPUID4_CACHE_LEVEL( eax ) != 2 ) continue;
+      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_INSTR ) continue;
+      return CPUID4_WAYS( ebx ) * CPUID4_PARTITIONS( ebx )
+           * CPUID4_LINE_SIZE( ebx ) * CPUID4_SETS( ecx );
+   }
+#endif
+#ifdef _SC_LEVEL2_CACHE_SIZE
+   {
+      long sz = sysconf( _SC_LEVEL2_CACHE_SIZE );
+      if( sz > 0 ) return sz;
+   }
+#endif
+   return 512L * 1024L;
+}
+
+static int MatrixChunkSize( int ncoord_in, int ncoord_out ) {
+/* Return the number of points to process per chunk for the FULL MatrixMap
+   SIMD path.  Sizes the chunk so that the input and output sub-arrays for
+   the chunk — (ncoord_in + ncoord_out) * chunk doubles — fit within half
+   the L2 cache.  Clamped to [64, 65536]. */
+   static long l2_cap = 0;
+   long bytes_per_point;
+   int chunk;
+   if( l2_cap == 0 ) l2_cap = DetectL2CapacityMM();
+   bytes_per_point = (long)( ncoord_in + ncoord_out ) * (long)sizeof(double);
+   chunk = (int)( l2_cap / 2L / bytes_per_point );
+   if( chunk < 64 ) chunk = 64;
+   if( chunk > 65536 ) chunk = 65536;
+   return chunk;
+}
+#endif /* AST_HAVE_SIMD */
+
 static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                                int forward, AstPointSet *out, int *status ) {
 /*
@@ -5116,6 +5181,14 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
    int npoint;                   /* Number of points */
    int out_coord;                /* Index of output coordinate */
    int point;                    /* Loop counter for points */
+#ifdef AST_HAVE_SIMD
+   int chunk_n;                  /* Number of points in current chunk */
+   int chunk_size;               /* Target L2-aware chunk size in points */
+   int chunk_start;              /* Index of first point in current chunk */
+   int has_bad_matrix;           /* True if any matrix element is AST__BAD */
+   int idx;                      /* Loop counter */
+   int ntot;                     /* Total number of matrix elements */
+#endif
 
 /* Check the global error status. */
    if ( !astOK ) return NULL;
@@ -5160,11 +5233,70 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 /* First deal with full MatrixMaps in which all matrix elements are stored. */
       if( map->form == FULL ){
 
-/* Loop to apply the matrix to each point in turn, checking for
-   (and propagating) bad values in the process. The matrix elements are
-   accessed sequentially in row order. The next matrix element to be
-   used is identified by a pointer which is initialised to point to the
-   first element of the matrix prior to processing each point. */
+#ifdef AST_HAVE_SIMD
+/* SIMD path: reorder loops to put points innermost so GCC can vectorise.
+   Only used when no matrix element is AST__BAD (checked once, upfront).
+   Processes points in L2-sized chunks so that the active pin/pout sub-arrays
+   stay cache-resident across the ncoord_in*ncoord_out accumulation passes,
+   reducing DRAM traffic at large N by a factor of ~ncoord_in. */
+         has_bad_matrix = 0;
+         ntot = ncoord_out * ncoord_in;
+         for( idx = 0; idx < ntot && !has_bad_matrix; idx++ )
+            has_bad_matrix = ( matrix[ idx ] == AST__BAD );
+
+         if( !has_bad_matrix ) {
+            chunk_size = MatrixChunkSize( ncoord_in, ncoord_out );
+
+            for( chunk_start = 0; chunk_start < npoint;
+                 chunk_start += chunk_size ) {
+               chunk_n = npoint - chunk_start;
+               if( chunk_n > chunk_size ) chunk_n = chunk_size;
+
+/* Initialise this chunk's output coordinate arrays to zero. */
+               for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+                  double *pout = ptr_out[ out_coord ] + chunk_start;
+                  #pragma omp simd
+                  for( idx = 0; idx < chunk_n; idx++ )
+                     pout[ idx ] = 0.0;
+               }
+
+/* Accumulate: for each (out_coord, in_coord) pair with a non-zero matrix
+   element, add m * pin[point] to pout[point] for this chunk.  The inner
+   loop over chunk points is independent and GCC vectorises it with AVX2
+   VFMADD.  All arrays fit in L2/2, so the accumulation is compute-bound
+   rather than DRAM-bandwidth-bound even at large N. */
+               for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+                  double *pout = ptr_out[ out_coord ] + chunk_start;
+                  for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                     double m = matrix[ out_coord * ncoord_in + in_coord ];
+                     if( m == 0.0 ) continue;
+                     double *pin = ptr_in[ in_coord ] + chunk_start;
+                     #pragma omp simd
+                     for( idx = 0; idx < chunk_n; idx++ )
+                        pout[ idx ] += m * pin[ idx ];
+                  }
+               }
+
+/* Fixup pass for this chunk: propagate AST__BAD where an input coordinate
+   is bad and the corresponding matrix element is non-zero. */
+               for( idx = 0; idx < chunk_n; idx++ ) {
+                  point = chunk_start + idx;
+                  for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                     if( ptr_in[ in_coord ][ point ] == AST__BAD ) {
+                        for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+                           if( matrix[ out_coord * ncoord_in + in_coord ] != 0.0 )
+                              ptr_out[ out_coord ][ point ] = AST__BAD;
+                        }
+                     }
+                  }
+               }
+            }
+
+         } else {
+#endif /* AST_HAVE_SIMD */
+
+/* Scalar path: loop over points, checking for (and propagating) bad values.
+   The matrix elements are accessed sequentially in row order. */
          for ( point = 0; point < npoint; point++ ) {
             matrix_element = matrix;
 
@@ -5213,6 +5345,10 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 
          }
 
+#ifdef AST_HAVE_SIMD
+         } /* end if( !has_bad_matrix ) */
+#endif
+
 /* Now deal with unit and diagonal MatrixMaps. */
       } else {
 
@@ -5240,6 +5376,17 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                indata = ptr_in[ out_coord ];
 
                if( diag_term != AST__BAD ){
+#ifdef AST_HAVE_SIMD
+/* Branchless blend: compute diag_term*val unconditionally, then select
+   AST__BAD for any element where val == AST__BAD.  GCC emits VCMPPD +
+   VBLENDVPD + VMULPD, eliminating the branch in the inner loop. */
+                  #pragma omp simd
+                  for( point = 0; point < npoint; point++ ){
+                     val = indata[ point ];
+                     outdata[ point ] = ( val != AST__BAD ) ? diag_term*val
+                                                            : AST__BAD;
+                  }
+#else
                   for( point = 0; point < npoint; point++ ){
                      val = *(indata++);
                      if( val != AST__BAD ){
@@ -5248,7 +5395,7 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
                         *(outdata++) = AST__BAD;
                      }
                   }
-
+#endif
                } else {
                   for( point = 0; point < npoint; point++ ){
                      *(outdata++) = AST__BAD;
