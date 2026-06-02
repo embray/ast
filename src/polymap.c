@@ -159,7 +159,8 @@ f     - AST_POLYTRAN: Fit a PolyMap inverse or forward transformation
 *        innermost loops over points are independent and GCC emits
 *        VMULPD/VADDPD via #pragma omp simd, followed by a scalar fixup pass
 *        for bad values; inputs are processed in L2-aware chunks (chunk size
-*        from astCPUCacheSize).  Falls back to TransformLoopScalar for
+*        from astCPUCacheSize).  Falls back to TransformLoopScalar for small
+*        point counts (where the per-call work-buffer setup dominates) and for
 *        subclasses that override PolyPowers (e.g. ChebyMap).  Add a UseSIMD
 *        attribute (default 1 when SIMD is available, 0 otherwise) for runtime
 *        selection of the scalar path; not serialised to Dump.
@@ -6294,6 +6295,10 @@ static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
    return chunk;
 }
 
+/* Minimum point count for which the SIMD path is worthwhile.  Below this the
+   per-call work-buffer allocation (one astMalloc per input coordinate and
+   power) costs more than the vectorisation saves, so we use the scalar loop. */
+#define SIMD_MIN_POINTS 16
 
 static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
                                int ncoord_in, int ncoord_out,
@@ -6363,6 +6368,13 @@ static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
 
 /* Fall back if a subclass overrides PolyPowers (e.g. ChebyMap). */
    if( ((AstPolyMapVtab *) astVTAB( this ))->PolyPowers != PolyPowers ) {
+      TransformLoopScalar( this, forward, npoint, ncoord_in, ncoord_out,
+                           ptr_in, ptr_out, status );
+      return;
+   }
+
+/* Fall back for small point counts, where the per-call buffer setup dominates. */
+   if( npoint < SIMD_MIN_POINTS ) {
       TransformLoopScalar( this, forward, npoint, ncoord_in, ncoord_out,
                            ptr_in, ptr_out, status );
       return;

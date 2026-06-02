@@ -196,12 +196,14 @@ f     The MatrixMap class does not define any new routines beyond those
 *        Refactor: factor out TransformLoopScalar and TransformLoopSIMD from
 *        Transform.  Add TransformLoop vtable slot.  Transform becomes a thin
 *        wrapper.  Add UseSIMD string attribute (default 1 when SIMD available,
-*        0 otherwise) accessible via astSet/astGet.  TransformLoopSIMD uses
-*        a two-pass vectorized path: accumlate M[out][in]*in[in][in][point]
-*        with per-point inner loops, then a scalar fixup pass for AST__BAD
-*        inputs.  The inputs are processed in chunks sized so that (ncoord_in
-*        + ncoord_out)*chunk doubles should fit in L2 cache, reducing DRAM
-*        traffic at large N.
+*        0 otherwise) accessible via astSet/astGet.  For a full matrix,
+*        TransformLoopSIMD computes each output coordinate with the point loop
+*        innermost under #pragma omp simd (GCC emits VFMADD), and runs the
+*        AST__BAD fixup pass only when a vectorised scan finds a bad input.
+*        For a diagonal matrix it uses a branchless blend.  Inputs are
+*        processed in chunks sized so that (ncoord_in + ncoord_out)*chunk
+*        doubles fit in L2 cache, which keeps the reused inputs cache-resident
+*        at large N.
 *class--
 */
 
@@ -5224,6 +5226,7 @@ static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
    int chunk_n;                  /* Points in current chunk */
    int chunk_size;               /* L2-aware chunk size */
    int chunk_start;              /* First point of current chunk */
+   int has_bad_input;            /* True if any input in chunk is AST__BAD */
    int has_bad_matrix;           /* True if any matrix element is AST__BAD */
    int in_coord;                 /* Input coordinate index */
    int idx;                      /* Loop counter in chunk */
@@ -5231,6 +5234,7 @@ static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
    int ntot;                     /* Total matrix elements */
    int out_coord;                /* Output coordinate index */
    int point;                    /* Point index (for fixup pass) */
+   int started;                  /* Output accumulator initialised */
 
    if( !astOK )
       return;
@@ -5266,35 +5270,60 @@ static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
          chunk_n = npoint - chunk_start;
          if( chunk_n > chunk_size ) chunk_n = chunk_size;
 
-/* Zero output chunk. */
+/* Compute each output coordinate in a single pass over the chunk: the first
+   contributing term initialises the accumulator (avoiding a separate zeroing
+   pass and a read-modify-write), and the rest are fused in. */
          for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
             double *pout = ptr_out[ out_coord ] + chunk_start;
-            #pragma omp simd
-            for( idx = 0; idx < chunk_n; idx++ )
-               pout[ idx ] = 0.0;
-         }
-
-/* Accumulate m*pin into pout for each (out,in) pair. */
-         for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
-            double *pout = ptr_out[ out_coord ] + chunk_start;
+            started = 0;
             for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
                double m = matrix[ out_coord * ncoord_in + in_coord ];
-               if( m == 0.0 ) continue;
+
+               if( m == 0.0 )
+                  continue;
+
                double *pin = ptr_in[ in_coord ] + chunk_start;
+               if( !started ) {
+                  #pragma omp simd
+                  for( idx = 0; idx < chunk_n; idx++ )
+                     pout[ idx ] = m * pin[ idx ];
+                  started = 1;
+               } else {
+                  #pragma omp simd
+                  for( idx = 0; idx < chunk_n; idx++ )
+                     pout[ idx ] += m * pin[ idx ];
+               }
+            }
+            if( !started ) {
                #pragma omp simd
                for( idx = 0; idx < chunk_n; idx++ )
-                  pout[ idx ] += m * pin[ idx ];
+                  pout[ idx ] = 0.0;
             }
          }
 
-/* Fixup: propagate AST__BAD for bad inputs. */
-         for( idx = 0; idx < chunk_n; idx++ ) {
-            point = chunk_start + idx;
-            for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-               if( ptr_in[ in_coord ][ point ] == AST__BAD ) {
-                  for( out_coord = 0; out_coord < ncoord_out; out_coord++ )
-                     if( matrix[ out_coord * ncoord_in + in_coord ] != 0.0 )
-                        ptr_out[ out_coord ][ point ] = AST__BAD;
+/* Fixup: propagating AST__BAD for bad inputs is only needed if the chunk
+   actually contains a bad input.  Detect that with a vectorised scan (the
+   inputs are still hot in cache from the accumulation above) and run the
+   scalar propagation only when necessary -- typical data has no bad values. */
+         has_bad_input = 0;
+         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+            double *pin = ptr_in[ in_coord ] + chunk_start;
+            int col_bad = 0;
+            #pragma omp simd reduction(|:col_bad)
+            for( idx = 0; idx < chunk_n; idx++ )
+               col_bad |= ( pin[ idx ] == AST__BAD );
+            has_bad_input |= col_bad;
+         }
+
+         if( has_bad_input ) {
+            for( idx = 0; idx < chunk_n; idx++ ) {
+               point = chunk_start + idx;
+               for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                  if( ptr_in[ in_coord ][ point ] == AST__BAD ) {
+                     for( out_coord = 0; out_coord < ncoord_out; out_coord++ )
+                        if( matrix[ out_coord * ncoord_in + in_coord ] != 0.0 )
+                           ptr_out[ out_coord ][ point ] = AST__BAD;
+                  }
                }
             }
          }

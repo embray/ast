@@ -42,11 +42,12 @@
 #include "grf_log.h"
 
 /* Recursively walk a (possibly compound) Mapping and set UseSIMD=0 on every
-   SphMap component.
+   component that has a SIMD-vectorised transform (SphMap, PolyMap, MatrixMap),
+   so the whole pipeline matches the scalar reference bit-for-bit.
 
    Too bad astMapList isn't part of the public API; it might be nice to have
    for cases like this. */
-static void disableSimdOnSphMaps( AstMapping *map ) {
+static void disableSimd( AstMapping *map ) {
    AstMapping *map1 = NULL;
    AstMapping *map2 = NULL;
    int series, inv1, inv2;
@@ -54,7 +55,7 @@ static void disableSimdOnSphMaps( AstMapping *map ) {
    if( !astOK || map == AST__NULL )
       return;
 
-   if( astIsASphMap( map ) ) {
+   if( astIsASphMap( map ) || astIsAPolyMap( map ) || astIsAMatrixMap( map ) ) {
       astSet( map, "UseSIMD=0" );
       return;
    }
@@ -62,8 +63,8 @@ static void disableSimdOnSphMaps( AstMapping *map ) {
    astDecompose( map, &map1, &map2, &series, &inv1, &inv2 );
 
    if( map2 != AST__NULL ) {
-      disableSimdOnSphMaps( map1 );
-      disableSimdOnSphMaps( map2 );
+      disableSimd( map1 );
+      disableSimd( map2 );
    }
 
    if( map1 != AST__NULL )
@@ -199,9 +200,9 @@ int main( int argc, char **argv ) {
       return 1;
    }
 
-   /* Optionally disable SIMD on any SphMap in the base->current mapping.
-      astGetMapping returns a copy of the mapping, so we set UseSIMD=0 on the
-      SphMaps in that copy and rebuild the FrameSet around it; the value is
+   /* Optionally disable SIMD on the base->current mapping.  astGetMapping
+      returns a copy of the mapping, so we set UseSIMD=0 on the SIMD-capable
+      components in that copy and rebuild the FrameSet around it; the value is
       preserved when the Plot subsequently copies the FrameSet. */
    if( no_simd && astOK ) {
       AstFrame *bfrm = astGetFrame( fs, AST__BASE );
@@ -209,7 +210,7 @@ int main( int argc, char **argv ) {
       AstMapping *map = astGetMapping( fs, AST__BASE, AST__CURRENT );
       AstFrameSet *nfs;
 
-      disableSimdOnSphMaps( map );
+      disableSimd( map );
 
       nfs = astFrameSet( bfrm, " " );
       astAddFrame( nfs, AST__BASE, map, cfrm );

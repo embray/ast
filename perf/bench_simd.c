@@ -16,6 +16,8 @@
  *
  * CSV output (transform column uses _simd / _scalar suffix):
  *   transform,n_points,rep,time_s
+ * where time_s is the amortised time for one transform of n_points points
+ * (each rep times a calibrated batch of repeated calls; see run_sweep).
  *
  * Usage:
  *   bench_simd [-o output.csv] [-r nreps] [--markdown]
@@ -39,6 +41,16 @@ static const size_t N_N_SWEEP = sizeof(N_SWEEP) / sizeof(N_SWEEP[0]);
 #define RAND_SEED 42UL
 #define DEFAULT_REPS 5
 #define IMAGE_HALF 2048.0   /* pixel coord half-range for poly/matrix */
+
+/*
+ * At small N a single astTranP call is dominated by call overhead and clock
+ * resolution rather than transform throughput. Each measurement therefore
+ * times a batch of repeated calls, growing the batch until it runs for at
+ * least MIN_BATCH_S, and reports the amortised per-call time. MAX_BATCH_CALLS
+ * bounds the batch so the tiniest N values do not run unboundedly.
+ */
+#define MIN_BATCH_S 0.02
+#define MAX_BATCH_CALLS ( 1 << 22 )
 
 /*
  * Degree-5 2-D PolyMap (Roman WCS SIP-like distortion, 10 terms).
@@ -141,6 +153,20 @@ static double now_s( void ) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+/* Run `ncalls` transforms of N points and return the elapsed seconds, or
+   -1.0 if a transform failed. */
+static double time_batch( AstMapping *map, int ncalls, int forward, size_t N,
+                          int nin, const double **ptr_in,
+                          int nout, double **ptr_out ) {
+    double t0 = now_s();
+    for( int k = 0; k < ncalls; k++ ) {
+        astTranP( map, (int)N, nin, ptr_in, forward, nout, ptr_out );
+        if( !astOK )
+            return -1.0;
+    }
+    return now_s() - t0;
+}
+
 /*
  * Run the N-sweep for one direction.
  * Records medians in g_sum for the summary table.
@@ -168,17 +194,32 @@ static int run_sweep( FILE *fout, AstMapping *map,
     for( size_t ni = 0; ni < N_N_SWEEP; ni++ ) {
         size_t N = N_SWEEP[ni];
 
-        for( int rep = 0; rep < nreps; rep++ ) {
-            double t0 = now_s();
-            astTranP( map, (int)N, nin, ptr_in, forward, nout, ptr_out );
-            rep_times[rep] = now_s() - t0;
+        /* Calibrate the batch size so a batch runs for at least MIN_BATCH_S.
+           This also serves as a warm-up for the rep measurements below. */
+        int ncalls = 1;
+        for( ;; ) {
+            double dt = time_batch( map, ncalls, forward, N,
+                                    nin, ptr_in, nout, ptr_out );
+            if( dt < 0.0 ) {
+                fprintf( stderr, "error: astTranP failed\n" );
+                return 1;
+            }
+            if( dt >= MIN_BATCH_S || ncalls >= MAX_BATCH_CALLS )
+                break;
+            ncalls *= 2;
+        }
 
-            if( !astOK ) {
+        for( int rep = 0; rep < nreps; rep++ ) {
+            double dt = time_batch( map, ncalls, forward, N,
+                                    nin, ptr_in, nout, ptr_out );
+            if( dt < 0.0 ) {
                 fprintf( stderr, "error: astTranP failed\n" );
                 return 1;
             }
 
-            fprintf( fout, "%s,%zu,%d,%.9f\n", full_label, N, rep, rep_times[rep] );
+            /* Amortised per-call time (one call transforms N points). */
+            rep_times[rep] = dt / ncalls;
+            fprintf( fout, "%s,%zu,%d,%.9e\n", full_label, N, rep, rep_times[rep] );
         }
         fflush( fout );
 
@@ -196,8 +237,9 @@ static int run_sweep( FILE *fout, AstMapping *map,
 
         record_sum( base_label, N, use_simd, median );
 
-        fprintf( stderr, "  %-30s  N=%-8zu  median=%8.3f ms  (%6.1f Mpx/s)\n",
-                 full_label, N, median * 1e3, (double)N / median / 1e6 );
+        fprintf( stderr,
+                 "  %-30s  N=%-8zu  x%-8d  median=%10.6f ms  (%6.1f Mpx/s)\n",
+                 full_label, N, ncalls, median * 1e3, (double)N / median / 1e6 );
     }
     return 0;
 }
