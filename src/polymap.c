@@ -151,13 +151,18 @@ f     - AST_POLYTRAN: Fit a PolyMap inverse or forward transformation
 *     28-JUL-2025 (DSB):
 *        - Add protected virtual method astMergeShift.
 *        - Add public static method astShowPoly.
-*     26-MAY-2026 (EMB):
-*        Add AST_HAVE_SIMD TransformSIMD: inverted loop order over points
-*        so innermost loops are independent and GCC emits VMULPD/VADDPD
-*        via #pragma omp simd, followed by a scalar fixup pass for bad
-*        values.  Wired into the vtab in place of Transform when
-*        AST_HAVE_SIMD is defined; falls back to scalar Transform for
-*        subclasses that override PolyPowers (e.g. ChebyMap).
+*     2-JUN-2026 (EMB):
+*        Add optional SIMD-vectorised transform path.  Factor the point loop
+*        out of Transform into TransformLoopScalar and TransformLoopSIMD,
+*        selected via a new TransformLoop vtable slot, leaving Transform as a
+*        thin wrapper.  TransformLoopSIMD inverts the loop order so the
+*        innermost loops over points are independent and GCC emits
+*        VMULPD/VADDPD via #pragma omp simd, followed by a scalar fixup pass
+*        for bad values; inputs are processed in L2-aware chunks (chunk size
+*        from astCPUCacheSize).  Falls back to TransformLoopScalar for
+*        subclasses that override PolyPowers (e.g. ChebyMap).  Add a UseSIMD
+*        attribute (default 1 when SIMD is available, 0 otherwise) for runtime
+*        selection of the scalar path; not serialised to Dump.
 *class--
 */
 
@@ -201,31 +206,6 @@ f     - AST_POLYTRAN: Fit a PolyMap inverse or forward transformation
 #include <string.h>
 #include <limits.h>
 #include <float.h>
-#ifdef AST_HAVE_SIMD
-#ifdef __x86_64__
-#include <cpuid.h> /* __cpuid_count -- GCC built-in on x86-64 */
-
-/* CPUID leaf 4 (Deterministic Cache Parameters) field extractors.
-   All three EBX fields and ECX are encoded as (actual_value - 1), so
-   each macro adds 1 to recover the true count. */
-#define CPUID4_CACHE_TYPE(eax) ( (eax) & 0x1f )
-#define CPUID4_CACHE_LEVEL(eax) ( ((eax) >> 5) & 0x7 )
-#define CPUID4_CACHE_TYPE_NULL 0   /* no more cache descriptors */
-#define CPUID4_CACHE_TYPE_DATA 1
-#define CPUID4_CACHE_TYPE_INSTR 2
-#define CPUID4_CACHE_TYPE_UNIFIED 3
-/* EBX[11:0]: cache line size in bytes, minus 1 */
-#define CPUID4_LINE_SIZE(ebx) ( (long)((ebx) & 0xfff) + 1L )
-/* EBX[21:12]: physical line partitions, minus 1 */
-#define CPUID4_PARTITIONS(ebx) ( (long)(((ebx) >> 12) & 0x3ff) + 1L )
-/* EBX[31:22]: ways of associativity, minus 1 */
-#define CPUID4_WAYS(ebx) ( (long)(((ebx) >> 22) & 0x3ff) + 1L )
-/* ECX: number of sets, minus 1 */
-#define CPUID4_SETS(ecx) ( (long)(ecx) + 1L )
-#endif
-
-#include <unistd.h> /* sysconf */
-#endif
 
 /* Module Variables. */
 /* ================= */
@@ -289,8 +269,11 @@ AstPolyMap *astPolyMapId_( int, int, int, const double[], int, const double[], c
 /* ======================================== */
 static AstMapping *LinearGuess( AstPolyMap *, int * );
 static AstPointSet *Transform( AstMapping *, AstPointSet *, int, AstPointSet *, int * );
+static void TransformLoopScalar( AstMapping *, int, int, int, int,
+                                 double **, double **, int * );
 #ifdef AST_HAVE_SIMD
-static AstPointSet *TransformSIMD( AstMapping *, AstPointSet *, int, AstPointSet *, int * );
+static void TransformLoopSIMD( AstMapping *, int, int, int, int,
+                               double **, double **, int * );
 #endif
 static AstPolyMap **GetJacobian( AstPolyMap *, int * );
 static AstPolyMap *MergeShift( AstPolyMap *, AstShiftMap *, int, int, int * );
@@ -500,6 +483,11 @@ static void ClearAttrib( AstObject *this_object, const char *attrib, int *status
 /* ----------- */
    } else if ( !strcmp( attrib, "tolinverse" ) ) {
       astClearTolInverse( this );
+
+/* UseSIMD */
+/* ------- */
+   } else if ( !strcmp( attrib, "usesimd" ) ) {
+      this->use_simd = -1;
 
 /* If the attribute is still not recognised, pass it on to the parent
    method for further interpretation. */
@@ -1947,6 +1935,19 @@ static const char *GetAttrib( AstObject *this_object, const char *attrib, int *s
          result = getattrib_buff;
       }
 
+/* UseSIMD */
+/* ------- */
+   } else if ( !strcmp( attrib, "usesimd" ) ) {
+#ifdef AST_HAVE_SIMD
+      ival = ( this->use_simd == -1 ) ? 1 : this->use_simd;
+#else
+      ival = ( this->use_simd == -1 ) ? 0 : this->use_simd;
+#endif
+      if ( astOK ) {
+         (void) sprintf( getattrib_buff, "%d", ival );
+         result = getattrib_buff;
+      }
+
 /* If the attribute name was not recognised, pass it on to the parent
    method for further interpretation. */
    } else {
@@ -2441,10 +2442,12 @@ void astInitPolyMapVtab_(  AstPolyMapVtab *vtab, const char *name, int *status )
    object->TestAttrib = TestAttrib;
 
    parent_transform = mapping->Transform;
-#ifdef AST_HAVE_SIMD
-   mapping->Transform = TransformSIMD;
-#else
    mapping->Transform = Transform;
+
+#ifdef AST_HAVE_SIMD
+   vtab->TransformLoop = TransformLoopSIMD;
+#else
+   vtab->TransformLoop = TransformLoopScalar;
 #endif
    mapping->GetTranForward = GetTranForward;
    mapping->GetTranInverse = GetTranInverse;
@@ -5657,6 +5660,23 @@ static void SetAttrib( AstObject *this_object, const char *setting, int *status 
         && ( nc >= len ) ) {
       astSetTolInverse( this, dval );
 
+/* UseSIMD. */
+/* -------- */
+   } else if ( nc = 0,
+        ( 1 == astSscanf( setting, "usesimd= %d %n", &ival, &nc ) )
+        && ( nc >= len ) ) {
+#ifndef AST_HAVE_SIMD
+      if( ival ) {
+         astError( AST__ATSER, "astSet(%s): SIMD support was not compiled in "
+                   "(rebuild with AST_ENABLE_SIMD=ON).", status,
+                   astGetClass( this ) );
+      } else {
+         this->use_simd = 0;
+      }
+#else
+      this->use_simd = ival ? 1 : 0;
+#endif
+
 /* If the attribute is still not recognised, pass it on to the parent
    method for further interpretation. */
    } else {
@@ -6014,6 +6034,11 @@ static int TestAttrib( AstObject *this_object, const char *attrib, int *status )
    } else if ( !strcmp( attrib, "tolinverse" ) ) {
       result = astTestTolInverse( this );
 
+/* UseSIMD */
+/* ------- */
+   } else if ( !strcmp( attrib, "usesimd" ) ) {
+      result = ( this->use_simd != -1 );
+
 /* If the attribute is still not recognised, pass it on to the parent
    method for further interpretation. */
    } else {
@@ -6022,6 +6047,111 @@ static int TestAttrib( AstObject *this_object, const char *attrib, int *status )
 
 /* Return the result, */
    return result;
+}
+
+static void TransformLoopScalar( AstMapping *this, int forward, int npoint,
+                                 int ncoord_in, int ncoord_out,
+                                 double **ptr_in, double **ptr_out,
+                                 int *status ) {
+/*
+*  Name:
+*     TransformLoopScalar
+
+*  Purpose:
+*     Scalar (non-SIMD) polynomial evaluation inner loop for PolyMap.
+
+*  Description:
+*     Evaluates the polynomial transform at all N points using a scalar
+*     per-point loop.  This is the default path; also used as the fallback
+*     from TransformLoopSIMD when UseSIMD=0 or the PolyPowers vtable slot
+*     has been overridden (e.g. ChebyMap).
+*/
+
+/* Local Variables: */
+   AstPolyMap *map;              /* Pointer to PolyMap */
+   double **coeff;               /* Coefficient value arrays */
+   double **work;                /* Exponentiated axis-value work array */
+   double *outcof;               /* Current coefficient value pointer */
+   double outval;                /* Current output axis value */
+   double term;                  /* Current polynomial term */
+   double xp;                    /* Axis value to required power */
+   int ***power;                 /* Coefficient power arrays */
+   int **outpow;                 /* Powers for current coefficient */
+   int *mxpow;                   /* Max power per input axis */
+   int *ncoeff;                  /* Number of coefficients per output */
+   int in_coord;                 /* Input coordinate index */
+   int ico;                      /* Coefficient index */
+   int nc;                       /* Number of coefficients for current output */
+   int out_coord;                /* Output coordinate index */
+   int point;                    /* Point index */
+   int pow;                      /* Current power */
+
+   if( !astOK )
+      return;
+
+   map = (AstPolyMap *) this;
+
+   if( forward ) {
+      ncoeff = map->ncoeff_f;
+      coeff = map->coeff_f;
+      power = map->power_f;
+      mxpow = map->mxpow_f;
+   } else {
+      ncoeff = map->ncoeff_i;
+      coeff = map->coeff_i;
+      power = map->power_i;
+      mxpow = map->mxpow_i;
+   }
+
+/* Allocate scalar work array [in_coord][pow]. */
+   work = astMalloc( sizeof(double *) * (size_t) ncoord_in );
+   for( in_coord = 0; in_coord < ncoord_in; in_coord++ )
+      work[ in_coord ] = astMalloc(
+         sizeof(double) * (size_t) astMAX( 2, mxpow[ in_coord ] + 1 ) );
+
+   if( astOK ) {
+      for( point = 0; point < npoint; point++ ) {
+         astPolyPowers( this, work, ncoord_in, mxpow, ptr_in, point,
+                        forward );
+         for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
+            outval = 0.0;
+            outcof = coeff[ out_coord ];
+            outpow = power[ out_coord ];
+            nc = ncoeff[ out_coord ];
+            for( ico = 0; ico < nc && outval != AST__BAD;
+                 ico++, outcof++, outpow++ ) {
+               term = *outcof;
+               if( term == AST__BAD ) {
+                  outval = AST__BAD;
+               } else {
+                  for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+                     pow = (*outpow)[ in_coord ];
+                     if( pow > 0 ) {
+                        xp = work[ in_coord ][ pow ];
+                        if( xp == AST__BAD ) {
+                           outval = AST__BAD;
+                           break;
+                        } else {
+                           term *= xp;
+                        }
+                     }
+                  }
+               }
+               if( outval != AST__BAD )
+                  outval += term;
+            }
+            ptr_out[ out_coord ][ point ] = outval;
+         }
+      }
+   }
+
+   for( in_coord = 0; in_coord < ncoord_in; in_coord++ )
+      work[ in_coord ] = astFree( work[ in_coord ] );
+
+   work = astFree( work );
+
+/* Suppress unused-variable warnings. */
+   (void) map;
 }
 
 static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
@@ -6046,8 +6176,10 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 *     method inherited from the Mapping class).
 
 *  Description:
-*     This function takes a PolyMap and a set of points encapsulated in a
-*     PointSet and transforms the points.
+*     Thin wrapper: validates arguments, creates the output PointSet, handles
+*     the IterInverse case, then delegates polynomial evaluation to the
+*     TransformLoop vtable slot (TransformLoopSIMD or TransformLoopScalar
+*     depending on compilation flags and the UseSIMD attribute).
 
 *  Parameters:
 *     this
@@ -6083,232 +6215,45 @@ static AstPointSet *Transform( AstMapping *this, AstPointSet *in,
 /* Local Variables: */
    AstPointSet *result;          /* Pointer to output PointSet */
    AstPolyMap *map;              /* Pointer to PolyMap to be applied */
-   double **coeff;               /* Pointer to coefficient value arrays */
+   AstPolyMapVtab *vtab;         /* Class virtual function table */
    double **ptr_in;              /* Pointer to input coordinate data */
    double **ptr_out;             /* Pointer to output coordinate data */
-   double **work;                /* Pointer to exponentiated axis values */
-   double *outcof;               /* Pointer to next coefficient value */
-   double outval;                /* Output axis value */
-   double term;                  /* Term to be added to output value */
-   double xp;                    /* Exponentiated input axis value */
-   int ***power;                 /* Pointer to coefficient power arrays */
-   int **outpow;                 /* Pointer to next set of axis powers */
-   int *mxpow;                   /* Pointer to max used power for each input */
-   int *ncoeff;                  /* Pointer to no. of coefficients */
-   int in_coord;                 /* Index of output coordinate */
-   int ico;                      /* Coefficient index */
-   int nc;                       /* No. of coefficients in polynomial */
-   int ncoord_in;                /* Number of coordinates per input point */
-   int ncoord_out;               /* Number of coordinates per output point */
+   int ncoord_in;                /* Number of input coordinates */
+   int ncoord_out;               /* Number of output coordinates */
    int npoint;                   /* Number of points */
-   int out_coord;                /* Index of output coordinate */
-   int point;                    /* Loop counter for points */
-   int pow;                      /* Next axis power */
 
 /* Check the global error status. */
    if ( !astOK ) return NULL;
 
-/* Obtain a pointer to the PolyMap. */
    map = (AstPolyMap *) this;
 
-/* Apply the parent mapping using the stored pointer to the Transform member
-   function inherited from the parent Mapping class. This function validates
-   all arguments and generates an output PointSet if necessary, but does not
-   actually transform any coordinate values. */
+/* Validate arguments and create the output PointSet. */
    result = (*parent_transform)( this, in, forward, out, status );
 
-/* Determine whether to apply the original forward or inverse mapping,
-   according to the direction specified and whether the mapping has been
-   inverted. */
+/* Correct for Invert flag. */
    if ( astGetInvert( map ) ) forward = !forward;
 
-/* We will now extend the parent astTransform method by performing the
-   calculations needed to generate the output coordinate values. */
-
-/* If we are using the original inverse transformatiom, and the IterInverse
-   attribute is non-zero, use an iterative inverse algorithm rather than any
-   inverse transformation defined within the PolyMap. */
-   if( !forward && astGetIterInverse(map) ) {
+/* IterInverse path: call the iterative inverse and return early. */
+   if( !forward && astGetIterInverse( map ) ) {
       IterInverse( map, in, result, status );
-
-/* Otherwise, determine the numbers of points and coordinates per point from
-   the input and output PointSets and obtain pointers for accessing the input
-   and output coordinate values. */
-   } else {
-      ncoord_in = astGetNcoord( in );
-      ncoord_out = astGetNcoord( result );
-      npoint = astGetNpoint( in );
-      ptr_in = astGetPoints( in );
-      ptr_out = astGetPoints( result );
-
-/* Get a pointer to the arrays holding the required coefficient
-   values and powers, according to the direction of mapping required. */
-      if ( forward ) {
-         ncoeff = map->ncoeff_f;
-         coeff = map->coeff_f;
-         power = map->power_f;
-         mxpow = map->mxpow_f;
-      } else {
-         ncoeff = map->ncoeff_i;
-         coeff = map->coeff_i;
-         power = map->power_i;
-         mxpow = map->mxpow_i;
-      }
-
-/* Allocate memory to hold the required powers of the input axis values. */
-      work = astMalloc( sizeof( double * )*(size_t) ncoord_in );
-      for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-         work[ in_coord ] = astMalloc( sizeof( double )*
-                           (size_t) ( astMAX( 2, mxpow[in_coord]+1 ) ) );
-      }
-
-/* Perform coordinate arithmetic. */
-/* ------------------------------ */
-      if ( astOK ) {
-
-/* Loop to apply the polynomial to each point in turn.*/
-         for ( point = 0; point < npoint; point++ ) {
-
-/* Find the required powers of the input axis values and store them
-   in the work array. Note, using a virtual method here slows the PolyMap
-   Transform function down by about 5%, compared to doing the equivalent
-   calculations in-line. But we need some way to allow the ChebyMap class
-   to over-ride the calculation of the powers, so we must do something
-   like this. If the 5% slow-down is too much, it can be reduced down to
-   about 2% by replacing the invocation of the astPolyPowers_ interface
-   function with a direct call to the implementation function itself.
-   This involves replacing the astPolyPowers call below with this:
-
-   (**astMEMBER(this,PolyMap,PolyPowers))( (AstPolyMap *) this, work, ncoord_in,
-                                           mxpow, ptr_in, point, forward, status );
-
-   The above could be wrapped up in an alternative implementation of the
-   astPolyPowers macro, so that it looks the same as the existing code.
-   In fact, this scheme could be more widely used to speed up invocation
-   of virtual functions within AST. The disadvantage is that the interface
-   functions for some virtual methods includes some extra processing,
-   over and above simply invoking the implementation function.
-
-   Of course the other way to get rid of the 5% slow down, is to
-   revert to using in-line code below, and then replicate this entire
-   function in the ChebyMap class, making suitable changes to use
-   Chebyshev functions in place of simple powers. But that is bad
-   structuring... */
-            astPolyPowers( this, work, ncoord_in, mxpow, ptr_in, point,
-                           forward );
-
-/* Loop round each output. */
-            for( out_coord = 0; out_coord < ncoord_out; out_coord++ ) {
-
-/* Initialise the output value. */
-               outval = 0.0;
-
-/* Get pointers to the coefficients and powers for this output. */
-               outcof = coeff[ out_coord ];
-               outpow = power[ out_coord ];
-
-/* Loop round all polynomial coefficients.*/
-               nc = ncoeff[ out_coord ];
-               for ( ico = 0; ico < nc && outval != AST__BAD;
-                     ico++, outcof++, outpow++ ) {
-
-/* Initialise the current term to be equal to the value of the coefficient.
-   If it is bad, store a bad output value. */
-                  term = *outcof;
-                  if( term == AST__BAD ) {
-                     outval = AST__BAD;
-
-/* Otherwise, loop round all inputs */
-                  } else {
-                     for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-
-/* Get the power of the current input axis value used by the current
-   coefficient. If it is zero, pass on. */
-                        pow = (*outpow)[ in_coord ];
-                        if( pow > 0 ) {
-
-/* Get the axis value raised to the appropriate power. */
-                           xp = work[ in_coord ][ pow ];
-
-/* If bad, set the output value bad and break. */
-                           if( xp == AST__BAD ) {
-                              outval = AST__BAD;
-                              break;
-
-/* Otherwise multiply the current term by the exponentiated axis value. */
-                           } else {
-                              term *= xp;
-                           }
-                        }
-                     }
-                  }
-
-/* Increment the output value by the current term of the polynomial. */
-                  if( outval != AST__BAD ) outval += term;
-
-               }
-
-/* Store the output value. */
-               ptr_out[ out_coord ][ point ] = outval;
-
-            }
-         }
-      }
-
-/* Free resources. */
-      for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-         work[ in_coord ] = astFree( work[ in_coord ] );
-      }
-      work = astFree( work );
+      return result;
    }
 
-/* Return a pointer to the output PointSet. */
+   ncoord_in  = astGetNcoord( in );
+   ncoord_out = astGetNcoord( result );
+   npoint     = astGetNpoint( in );
+   ptr_in     = astGetPoints( in );
+   ptr_out    = astGetPoints( result );
+
+   vtab = (AstPolyMapVtab *) astVTAB( this );
+   if( astOK )
+      vtab->TransformLoop( this, forward, npoint, ncoord_in, ncoord_out,
+                           ptr_in, ptr_out, status );
+
    return result;
 }
 
 #ifdef AST_HAVE_SIMD
-
-static long DetectL2Capacity( void ) {
-/*
-*  Name:
-*     DetectL2Capacity
-
-*  Purpose:
-*     Return the size of the L2 data cache in bytes.
-
-*  Description:
-*     Queries the L2 cache size via CPUID (x86-64) if available, falling
-*     back to sysconf, and finally to a 512 KiB default.  Intended for
-*     use by SIMDChunkSize; not called directly.
-*/
-#ifdef __x86_64__
-   unsigned eax, ebx, ecx, edx, idx;
-   for( idx = 0; ; idx++ ) {
-      __cpuid_count( 4, idx, eax, ebx, ecx, edx );
-
-      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_NULL )
-         break;
-
-      if( CPUID4_CACHE_LEVEL( eax ) != 2 )
-         continue;
-
-      if( CPUID4_CACHE_TYPE( eax ) == CPUID4_CACHE_TYPE_INSTR )
-         continue;
-
-      return CPUID4_WAYS( ebx ) * CPUID4_PARTITIONS( ebx )
-           * CPUID4_LINE_SIZE( ebx ) * CPUID4_SETS( ecx );
-   }
-#endif
-#ifdef _SC_LEVEL2_CACHE_SIZE
-   long sz = sysconf( _SC_LEVEL2_CACHE_SIZE );
-
-   if( sz > 0 )
-      return sz;
-#endif
-/* Fallback guess: 512KiB */
-   return 512L * 1024L;
-}
-
 
 static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
 /*
@@ -6316,12 +6261,12 @@ static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
 *     SIMDChunkSize
 
 *  Purpose:
-*     Return the number of points to process per SIMD chunk in TransformSIMD.
+*     Return the number of points to process per SIMD chunk in TransformLoopSIMD.
 
 *  Description:
 *     Computes a chunk size that keeps the work and term buffers within half
 *     the L2 cache, so the hot data stays cache-resident across passes.
-*     The L2 size is detected once and stored in a static variable.
+*     Uses astCPUCacheSize to detect the L2 size.
 
 *  Parameters:
 *     ncoord_in
@@ -6332,17 +6277,13 @@ static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
 *  Returned Value:
 *     Chunk size in points, clamped to [64, 65536].
 */
-   static long l2_cap = 0;
    long bytes_per_point;
    int chunk;
-
-   if( l2_cap == 0 )
-      l2_cap = DetectL2Capacity();
 
 /* work[ncoord_in][max_mxpow+1][chunk] doubles + term[chunk] doubles. */
    bytes_per_point = ( (long)ncoord_in * ( max_mxpow + 1 ) + 1L )
                      * (long)sizeof(double);
-   chunk = (int)( l2_cap / 2L / bytes_per_point );
+   chunk = (int)( astCPUCacheSize(2) / 2L / bytes_per_point );
 
    if( chunk < 64 )
       chunk = 64;
@@ -6354,179 +6295,129 @@ static int SIMDChunkSize( int ncoord_in, int max_mxpow ) {
 }
 
 
-static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
-                                   int forward, AstPointSet *out, int *status ) {
+static void TransformLoopSIMD( AstMapping *this, int forward, int npoint,
+                               int ncoord_in, int ncoord_out,
+                               double **ptr_in, double **ptr_out, int *status ) {
 /*
 *  Name:
-*     TransformSIMD
+*     TransformLoopSIMD
 
 *  Purpose:
-*     Apply a PolyMap to transform a set of points using SIMD-vectorised loops.
-
-*  Type:
-*     Private function.
-
-*  Synopsis:
-*     #include "polymap.h"
-*     AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
-*                                 int forward, AstPointSet *out, int *status )
-
-*  Class Membership:
-*     PolyMap member function.  Replaces Transform in the vtab when
-*     AST_HAVE_SIMD is defined.
+*     SIMD-vectorised polynomial evaluation inner loop for PolyMap.
 
 *  Description:
-*     Equivalent to Transform but restructures the polynomial evaluation
-*     so that the innermost loop iterates over points rather than over
-*     coordinates or coefficients.  The resulting loops are independent
-*     over points and GCC can vectorise them with #pragma omp simd,
-*     emitting AVX2 VMULPD instructions for power computation and VADDPD
-*     for accumulation.
+*     Inverted loop order: outermost loop over coefficients/powers, innermost
+*     loop over points.  The point-loops are independent and GCC vectorises
+*     them with #pragma omp simd (VMULPD for power computation, VADDPD for
+*     accumulation).
 *
 *     Three-pass approach:
-*       Pass 1: for each input coordinate, compute work[coord][pow][point]
-*         = x_coord[point]^pow for all N points via repeated multiply.
-*       Pass 2: for each output coordinate, zero the output array then
-*         accumulate each polynomial term: initialise a per-point scratch
-*         buffer to the coefficient value, multiply in each power factor,
-*         then add to the output -- all with SIMD inner loops over points.
-*         A bad coefficient poisons the entire output coordinate (same
-*         semantics as the scalar Transform).
-*       Pass 3 (fixup): scalar pass that overwrites outputs with AST__BAD
-*         for any point where at least one input coordinate was AST__BAD.
+*       Pass 1: work[coord][pow][point] = x[point]^pow for all N points.
+*       Pass 2: for each output, zero then accumulate polynomial terms.
+*       Pass 3: scalar fixup: overwrite with AST__BAD where any input bad.
 *
-*     Falls back to the scalar Transform for subclasses that override
-*     PolyPowers (e.g. ChebyMap), detected by comparing the vtab slot
-*     to PolyMap's own PolyPowers implementation.
-
-*  Parameters:
-*     As for Transform.
-
-*  Returned Value:
-*     Pointer to the output (possibly new) PointSet.
+*     Falls back to TransformLoopScalar when UseSIMD=0 or PolyPowers is
+*     overridden (e.g. ChebyMap).
 */
 
 /* Local Variables: */
-   AstPointSet *result;
    AstPolyMap *map;
-   double ***work;        /* work[in_coord][pow] -> npoint doubles */
-   double **coeff;
-   double **ptr_in;
-   double **ptr_out;
-   double *outcof;        /* pointer to current coefficient value */
-   double *pout;          /* pointer to current output coord array */
+   double ***work;        /* work[in_coord][pow] -> chunk_size doubles */
+   double **coeff;        /* coefficient value arrays */
+   double *outcof;        /* current coefficient value pointer */
+   double *pout;          /* current output coord pointer in chunk */
    double *term;          /* per-point scratch for term accumulation */
-   double *w0;            /* pointer to work[in_coord][0] */
-   double *wprev;         /* pointer to work[in_coord][pow-1] */
-   double *wp;            /* pointer to current work array (reused in pass 1 and 2) */
-   double *xvec;          /* pointer to current input coord array */
+   double *w0;            /* work[in_coord][0] */
+   double *wprev;         /* work[in_coord][pow-1] */
+   double *wp;            /* current work sub-array */
+   double *xvec;          /* ptr_in[in_coord] + chunk_start */
    double c;              /* current coefficient value */
-   int ***power;
-   int **outpow;
-   int *mxpow;
-   int *ncoeff;
-   int bad;
-   int chunk_n;           /* number of points in current chunk */
-   int chunk_size;        /* target chunk size from SIMDChunkSize */
-   int chunk_start;       /* index of first point in current chunk */
-   int ico;
-   int in_coord;
-   int max_mxpow;         /* max over input coords of mxpow[in_coord] */
-   int nc;
-   int ncoord_in;
-   int ncoord_out;
-   int npoint;
-   int npow;
-   int out_coord;
-   int point;
-   int pow;
+   int ***power;          /* coefficient power arrays */
+   int **outpow;          /* powers for current coefficient */
+   int *mxpow;            /* max powers per input axis */
+   int *ncoeff;           /* number of coefficients per output */
+   int bad;               /* inputs have bad points */
+   int chunk_n;           /* points in current chunk */
+   int chunk_size;        /* chunk size from SIMDChunkSize */
+   int chunk_start;       /* first point in current chunk */
+   int ico;               /* coefficient index */
+   int in_coord;          /* input coordinate index */
+   int max_mxpow;         /* max mxpow across input coords */
+   int nc;                /* number of coefficients per current output */
+   int npow;              /* number of powers per current input */
+   int out_coord;         /* output coordinate index */
+   int point;             /* point index */
+   int pow;               /* current power */
 
-/* Check the global error status. */
-   if ( !astOK ) return NULL;
-
-/* If a subclass has overridden PolyPowers (e.g. ChebyMap), fall back to
-   the scalar Transform which uses virtual PolyPowers dispatch correctly. */
-   if( ((AstPolyMapVtab *) astVTAB( this ))->PolyPowers != PolyPowers ) {
-      return Transform( this, in, forward, out, status );
-   }
+   if( !astOK )
+      return;
 
    map = (AstPolyMap *) this;
 
-/* Validate arguments and create the output PointSet. */
-   result = (*parent_transform)( this, in, forward, out, status );
+/* Fall back if UseSIMD disabled. */
+   if( map->use_simd == 0 ) {
+      TransformLoopScalar( this, forward, npoint, ncoord_in, ncoord_out,
+                           ptr_in, ptr_out, status );
+      return;
+   }
 
-/* Determine whether to apply the original forward or inverse mapping. */
-   if ( astGetInvert( map ) )
-      forward = !forward;
+/* Fall back if a subclass overrides PolyPowers (e.g. ChebyMap). */
+   if( ((AstPolyMapVtab *) astVTAB( this ))->PolyPowers != PolyPowers ) {
+      TransformLoopScalar( this, forward, npoint, ncoord_in, ncoord_out,
+                           ptr_in, ptr_out, status );
+      return;
+   }
 
-/* Use the iterative inverse if requested. */
-   if( !forward && astGetIterInverse( map ) ) {
-      IterInverse( map, in, result, status );
-
+   if( forward ) {
+      ncoeff = map->ncoeff_f;
+      coeff = map->coeff_f;
+      power = map->power_f;
+      mxpow = map->mxpow_f;
    } else {
-      ncoord_in = astGetNcoord( in );
-      ncoord_out = astGetNcoord( result );
-      npoint = astGetNpoint( in );
-      ptr_in = astGetPoints( in );
-      ptr_out = astGetPoints( result );
+      ncoeff = map->ncoeff_i;
+      coeff = map->coeff_i;
+      power = map->power_i;
+      mxpow = map->mxpow_i;
+   }
 
-      if( forward ) {
-         ncoeff = map->ncoeff_f;
-         coeff = map->coeff_f;
-         power = map->power_f;
-         mxpow = map->mxpow_f;
-      } else {
-         ncoeff = map->ncoeff_i;
-         coeff = map->coeff_i;
-         power = map->power_i;
-         mxpow = map->mxpow_i;
-      }
+   max_mxpow = 0;
+   for( in_coord = 0; in_coord < ncoord_in; in_coord++ )
+      if( mxpow[ in_coord ] > max_mxpow ) max_mxpow = mxpow[ in_coord ];
 
-/* Compute the maximum power across all input coordinates, used to size
-   work arrays and to derive the SIMD chunk size. */
-      max_mxpow = 0;
-      for( in_coord = 0; in_coord < ncoord_in; in_coord++ )
-         if( mxpow[ in_coord ] > max_mxpow ) max_mxpow = mxpow[ in_coord ];
+   chunk_size = SIMDChunkSize( ncoord_in, max_mxpow );
 
-/* Choose a chunk size that keeps work + term buffers within half the L2
-   cache, avoiding the memory-pressure regression seen at large N when
-   allocating npoint-sized arrays. */
-      chunk_size = SIMDChunkSize( ncoord_in, max_mxpow );
-
-/* Allocate work[in_coord][pow][0..chunk_size-1] and a term buffer, both
-   sized to chunk_size rather than npoint. */
-      work = astMalloc( sizeof(double **) * (size_t) ncoord_in );
-      term = astMalloc( sizeof(double) * (size_t) chunk_size );
-      if( astOK ) {
-         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-            npow = astMAX( 2, mxpow[ in_coord ] + 1 );
-            work[ in_coord ] = astMalloc( sizeof(double *) * (size_t) npow );
-            if( astOK ) {
-               for( pow = 0; pow < npow; pow++ )
-                  work[ in_coord ][ pow ] = astMalloc(
-                        sizeof(double) * (size_t) chunk_size );
-            }
+   work = astMalloc( sizeof(double **) * (size_t) ncoord_in );
+   term = astMalloc( sizeof(double) * (size_t) chunk_size );
+   if( astOK ) {
+      for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+         npow = astMAX( 2, mxpow[ in_coord ] + 1 );
+         work[ in_coord ] = astMalloc( sizeof(double *) * (size_t) npow );
+         if( astOK ) {
+            for( pow = 0; pow < npow; pow++ )
+               work[ in_coord ][ pow ] = astMalloc(
+                  sizeof(double) * (size_t) chunk_size );
          }
       }
-
-      if( astOK ) {
+   }
 
 /* Process points in chunks of chunk_size so that work + term stay
    resident in L2 cache across all three passes. */
-         for( chunk_start = 0; chunk_start < npoint; chunk_start += chunk_size ) {
+   if( astOK ) {
+      for( chunk_start = 0; chunk_start < npoint; chunk_start += chunk_size ) {
             chunk_n = npoint - chunk_start;
 
             if( chunk_n > chunk_size )
                chunk_n = chunk_size;
 
 /* Compute work[coord][pow][point] = x_coord[point]^pow.
-   Innermost loop over points is independent -- GCC vectorises. */
+   Innermost loop over points is independent--GCC vectorises. */
             for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
                w0 = work[ in_coord ][ 0 ];
                xvec = ptr_in[ in_coord ] + chunk_start;
 
                #pragma omp simd
-               for( point = 0; point < chunk_n; point++ ) w0[ point ] = 1.0;
+               for( point = 0; point < chunk_n; point++ )
+                  w0[ point ] = 1.0;
 
                for( pow = 1; pow <= mxpow[ in_coord ]; pow++ ) {
                   wprev = work[ in_coord ][ pow - 1 ];
@@ -6552,7 +6443,8 @@ static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
                for( ico = 0; ico < nc; ico++, outcof++, outpow++ ) {
                   c = *outcof;
 
-                  if( c == 0.0 ) continue;
+                  if( c == 0.0 )
+                     continue;
 
 /* A bad coefficient poisons all outputs for this coordinate (same as
    the scalar Transform). */
@@ -6608,21 +6500,24 @@ static AstPointSet *TransformSIMD( AstMapping *this, AstPointSet *in,
       }
 
 /* Free work arrays. */
-      term = astFree( term );
-      if( work ) {
-         for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
-            if( work[ in_coord ] ) {
-               npow = astMAX( 2, mxpow[ in_coord ] + 1 );
-               for( pow = 0; pow < npow; pow++ )
-                  work[ in_coord ][ pow ] = astFree( work[ in_coord ][ pow ] );
-               work[ in_coord ] = astFree( work[ in_coord ] );
-            }
+   term = astFree( term );
+
+   if( work ) {
+      for( in_coord = 0; in_coord < ncoord_in; in_coord++ ) {
+         if( work[ in_coord ] ) {
+            npow = astMAX( 2, mxpow[ in_coord ] + 1 );
+
+            for( pow = 0; pow < npow; pow++ )
+               work[ in_coord ][ pow ] = astFree( work[ in_coord ][ pow ] );
+
+            work[ in_coord ] = astFree( work[ in_coord ] );
          }
-         work = astFree( work );
       }
+      work = astFree( work );
    }
 
-   return result;
+/* Suppress unused-variable warning. */
+   (void) map;
 }
 #endif /* AST_HAVE_SIMD */
 
@@ -7521,6 +7416,7 @@ AstPolyMap *astInitPolyMap_( void *mem, size_t size, int init,
       new->tolinverse = AST__BAD;
       new->jacobian = NULL;
       new->lintrunc = NULL;
+      new->use_simd = -1;
 
 /* If an error occurred, clean up by deleting the new PolyMap. */
       if ( !astOK ) new = astDelete( new );
@@ -7840,6 +7736,9 @@ AstPolyMap *astLoadPolyMap_( void *mem, size_t size,
 
 /* The linear truncation of the PolyMap has not yet been found. */
       new->lintrunc = NULL;
+
+/* UseSIMD is a runtime tuning attribute; not persisted. Default at load. */
+      new->use_simd = -1;
 
 /* If an error occurred, clean up by deleting the new PolyMap. */
       if ( !astOK ) new = astDelete( new );

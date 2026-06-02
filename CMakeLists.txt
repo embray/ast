@@ -834,7 +834,7 @@ ast_apply_dev_options(ast)
 # that -ffast-math and -march= do not change the FP semantics of the rest of
 # libast. AST_HAVE_SIMD guards the restructured loops inside those files.
 if(AST_SIMD_FLAGS)
-    set_source_files_properties(src/sphmap.c src/polymap.c
+    set_source_files_properties(src/sphmap.c src/polymap.c src/matrixmap.c
         PROPERTIES COMPILE_OPTIONS "${AST_SIMD_FLAGS}")
     target_compile_definitions(ast PRIVATE AST_HAVE_SIMD=1)
 endif()

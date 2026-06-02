@@ -16,6 +16,7 @@
 # Optional:
 #   REF_FILE  : reference SVG file (omit for smoke-only)
 #   BOX       : graphics bounds "xlo ylo xhi yhi" (omit for auto)
+#   NO_SIMD   : if set, pass --no-simd to testgrid (disable SIMD on SphMaps)
 
 foreach(_req IN ITEMS TESTGRID HEAD_FILE ATTR FATTR OUT_FILE)
     if(NOT DEFINED ${_req})
@@ -23,7 +24,11 @@ foreach(_req IN ITEMS TESTGRID HEAD_FILE ATTR FATTR OUT_FILE)
     endif()
 endforeach()
 
-set(_cmd "${TESTGRID}" "${HEAD_FILE}" "${ATTR}" "${FATTR}" "${OUT_FILE}")
+set(_cmd "${TESTGRID}")
+if(DEFINED NO_SIMD AND NO_SIMD)
+    list(APPEND _cmd "--no-simd")
+endif()
+list(APPEND _cmd "${HEAD_FILE}" "${ATTR}" "${FATTR}" "${OUT_FILE}")
 if(DEFINED BOX AND NOT BOX STREQUAL "")
     separate_arguments(_box UNIX_COMMAND "${BOX}")
     list(APPEND _cmd ${_box})
@@ -45,37 +50,9 @@ if(DEFINED REF_FILE AND NOT REF_FILE STREQUAL "")
     list(SORT _ref_lines)
     list(SORT _out_lines)
 
-    # Normalize integer pixel coordinates by rounding each integer down to the
-    # nearest even value (floor(N/2)*2).  This gives +/-1 pixel tolerance so
-    # that builds using libmvec vector-math (which may differ from scalar libm
-    # by 1 ULP) still match the reference after the integer pixel rounding that
-    # occurs inside the SVG plotter.  Non-coordinate numbers (font-size, label
-    # text like "-20") are also rounded but identically in both files, so they
-    # continue to compare equal.
-    function(_normalize_pixels lines_var out_var)
-        set(_result)
-        foreach(_line IN LISTS ${lines_var})
-            set(_normalized "")
-            set(_rest "${_line}")
-            while(_rest MATCHES "^([^0-9]*)([0-9]+)(.*)")
-                set(_prefix "${CMAKE_MATCH_1}")
-                set(_num    "${CMAKE_MATCH_2}")
-                set(_rest   "${CMAKE_MATCH_3}")
-                math(EXPR _rounded "${_num} / 2 * 2")
-                string(APPEND _normalized "${_prefix}${_rounded}")
-            endwhile()
-            string(APPEND _normalized "${_rest}")
-            list(APPEND _result "${_normalized}")
-        endforeach()
-        set(${out_var} "${_result}" PARENT_SCOPE)
-    endfunction()
-
-    _normalize_pixels(_ref_lines _ref_norm)
-    _normalize_pixels(_out_lines _out_norm)
-
     # Write to temp files for diffing.
-    string(REPLACE ";" "\n" _ref_text "${_ref_norm}")
-    string(REPLACE ";" "\n" _out_text "${_out_norm}")
+    string(REPLACE ";" "\n" _ref_text "${_ref_lines}")
+    string(REPLACE ";" "\n" _out_text "${_out_lines}")
     file(WRITE "${OUT_FILE}.ref.txt" "${_ref_text}\n")
     file(WRITE "${OUT_FILE}.out.txt" "${_out_text}\n")
 
