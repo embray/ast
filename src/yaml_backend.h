@@ -40,7 +40,6 @@
 *     astYamlParserSetInput     Register I/O read callback.
 *     astYamlParserParse        Parse one event into an AstYamlEvent.
 *     astYamlParserGetError     Primary error message and 0-based line/col.
-*     astYamlParserGetContext   Context description and 0-based line/col (or NULL).
 *     astYamlEventDelete        Release event resources.
 *     astYamlEmitterInitialize  Initialise emitter.
 *     astYamlEmitterDelete      Release emitter resources.
@@ -153,11 +152,9 @@ static inline void astYamlParserDelete( AstYamlParser *p ) {
    the location is not available.
    astYamlParserGetError returns a heap-allocated string that combines
    problem and (when present) context; the string is owned by the parser
-   and freed on the next call or when the parser is deleted.
-   astYamlParserGetContext always returns NULL for libyaml because context
-   is already folded into the combined message. */
+   and freed on the next call or when the parser is deleted. */
 static inline const char *astYamlParserGetError( AstYamlParser *p,
-                                                  int *line, int *col ) {
+                                                 int *line, int *col ) {
    const char *problem = p->yp.problem ? p->yp.problem : "unknown error";
    const char *context = p->yp.context;
    char *msg;
@@ -176,13 +173,6 @@ static inline const char *astYamlParserGetError( AstYamlParser *p,
       }
    }
    return problem;
-}
-static inline const char *astYamlParserGetContext( AstYamlParser *p,
-                                                    int *line, int *col ) {
-   (void) p;
-   *line = -1;
-   *col  = -1;
-   return NULL;
 }
 
 /* Event delete: operate on the embedded yaml_event_t. */
@@ -404,13 +394,13 @@ static inline int astYamlEmitSequenceEnd( AstYamlEmitter *emitter ) {
 
 #define YAML_STR_TAG "tag:yaml.org,2002:str"
 
-/* Parser handle: wraps struct fy_parser plus a buffered input copy
-   that must outlive the parser (fy_parser_set_string does not copy). */
+/* Parser handle: wraps struct fy_parser.  libfyaml pulls input on demand
+   through _astFyamlReadAdapter, which forwards to AST's read callback. */
 typedef struct {
    struct fy_parser *fyp;
-   char *buf;
    AstYamlReadCb read_cb;
    void *read_data;
+   char *errmsg;
 } AstYamlParser;
 
 /* Emitter handle: wraps struct fy_emitter; the fy_emitter is created
@@ -430,6 +420,7 @@ typedef struct {
    const char *tag_handle;
    const char *tag_prefix;
    char *pending_root_tag;
+   char *errmsg;
 } AstYamlEmitter;
 
 /* Flat event struct.  For libfyaml the underlying struct fy_event * is
@@ -521,40 +512,69 @@ static int _astFyamlWriteAdapter( struct fy_emitter *emit,
    Line and column come from the first collected error; line is -1 when
    not available.  Context is always NULL (libfyaml has no equivalent). */
 static inline const char *astYamlParserGetError( AstYamlParser *p,
-                                                  int *line, int *col ) {
+                                                 int *line, int *col ) {
    struct fy_diag *diag;
    struct fy_diag_error *err;
    void *iter = NULL;
+   char *msg = NULL;
    *line = -1; *col = -1;
-   if( !p->fyp ) return "libfyaml parser not initialised";
+
+   if( !p->fyp )
+      return "libfyaml parser not initialised";
+
    diag = fy_parser_get_diag( p->fyp );
-   if( !diag ) return "unknown error";
+
+   free( p->errmsg );
+
+   if( !diag )
+      return "unknown error";
+
    err = fy_diag_errors_iterate( diag, &iter );
-   fy_diag_unref( diag );
-   if( !err || !err->msg ) return "unknown error";
-   /* fy_diag stores line/column 1-based; subtract 1 to match libyaml's
-      0-based convention (callers add 1 back for display). */
-   *line = err->line - 1;
-   *col  = err->column - 1;
-   return err->msg;
+
+   if( err ) {
+      /* fy_diag stores line/column 1-based; subtract 1 to match libyaml's
+         0-based convention (callers add 1 back for display). */
+      *line = err->line - 1;
+      *col  = err->column - 1;
+      if ( err->msg )
+         msg = strdup( err->msg );
+   }
+
+   fy_diag_destroy( diag );
+
+   if ( msg )
+      p->errmsg = msg;
+
+   return msg ? msg : "unknown error";
 }
-static inline const char *astYamlParserGetContext( AstYamlParser *p,
-                                                    int *line, int *col ) {
-   (void) p;
-   *line = -1; *col = -1;
-   return NULL;
-}
+
 static inline const char *astYamlEmitterGetError( AstYamlEmitter *e ) {
    struct fy_diag *diag;
    struct fy_diag_error *err;
    void *iter = NULL;
-   if( !e->fye ) return "libfyaml emitter not initialised";
+   char *msg = NULL;
+
+   if( !e->fye )
+      return "libfyaml emitter not initialised";
+
    diag = fy_emitter_get_diag( e->fye );
-   if( !diag ) return "unknown error";
+
+   if( !diag )
+      return "unknown error";
+
+   free( e->errmsg );
+
    err = fy_diag_errors_iterate( diag, &iter );
-   fy_diag_unref( diag );
-   if( !err || !err->msg ) return "unknown error";
-   return err->msg;
+
+   if( err && err->msg )
+      msg = strdup( err->msg );
+
+   fy_diag_destroy( diag );
+
+   if( msg )
+      e->errmsg = msg;
+
+   return msg ? msg : "unknown error";
 }
 
 /* Parser lifecycle. */
@@ -569,48 +589,32 @@ static inline void astYamlParserDelete( AstYamlParser *parser ) {
       fy_parser_destroy( parser->fyp );
       parser->fyp = NULL;
    }
-   free( parser->buf );
-   parser->buf = NULL;
+   free( parser->errmsg );
+   parser->errmsg = NULL;
 }
 
-/* astYamlParserSetInput: register a read callback.
-   Because libfyaml's set-string API requires the buffer to remain valid
-   for the lifetime of the parser (this allows it zero-copy reads, though
-   we mostly use the copying *0 variants to get null-terminated strings),
-   we buffer the entire input here. */
+/* Adapt AST's read callback to libfyaml's streaming input callback: return
+   the number of bytes read, 0 at end of input, or -1 on error. */
+static ssize_t _astFyamlReadAdapter( void *user, void *buf, size_t count ) {
+   AstYamlParser *parser = (AstYamlParser *) user;
+   size_t nread = 0;
+   if( !parser->read_cb( parser->read_data, (unsigned char *) buf, count,
+                         &nread ) ) {
+      return -1;
+   }
+   return (ssize_t) nread;
+}
+
+/* astYamlParserSetInput: point the parser at AST's read callback.  libfyaml
+   pulls the input incrementally through _astFyamlReadAdapter, so there is no
+   need to buffer the whole input up front. */
 static inline void astYamlParserSetInput( AstYamlParser *parser,
                                           AstYamlReadCb cb,
                                           void *data ) {
-   unsigned char tmp[ 4096 ];
-   size_t nread;
-   size_t buf_len = 0;
-   size_t buf_cap = 0;
-   char *new_buf;
    struct fy_parse_cfg cfg;
 
    parser->read_cb = cb;
    parser->read_data = data;
-
-   while( 1 ) {
-      nread = 0;
-      if( !cb( data, tmp, sizeof( tmp ), &nread ) || nread == 0 ) {
-         break;
-      }
-
-      if( buf_len + nread > buf_cap ) {
-         buf_cap = buf_cap * 2 + nread + 1;
-         new_buf = realloc( parser->buf, buf_cap );
-
-         if( !new_buf ) {
-            return;
-         }
-
-         parser->buf = new_buf;
-      }
-
-      memcpy( parser->buf + buf_len, tmp, nread );
-      buf_len += nread;
-   }
 
    memset( &cfg, 0, sizeof( cfg ) );
    parser->fyp = fy_parser_create( &cfg );
@@ -621,9 +625,7 @@ static inline void astYamlParserSetInput( AstYamlParser *parser,
          fy_diag_set_collect_errors( diag, true );
          fy_diag_unref( diag );
       }
-      if( buf_len > 0 ) {
-         fy_parser_set_string( parser->fyp, parser->buf, buf_len );
-      }
+      fy_parser_set_input_callback( parser->fyp, parser, _astFyamlReadAdapter );
    }
 }
 
@@ -726,6 +728,8 @@ static inline void astYamlEmitterDelete( AstYamlEmitter *emitter ) {
    emitter->line_buf_cap = 0;
    free( emitter->pending_root_tag );
    emitter->pending_root_tag = NULL;
+   free( emitter->errmsg );
+   emitter->errmsg = NULL;
 }
 
 static inline void astYamlEmitterSetOutput( AstYamlEmitter *emitter,
