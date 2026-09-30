@@ -828,6 +828,7 @@ if(HAVE_PTHREADS)
         set_tests_properties(testthreadexit PROPERTIES
             ENVIRONMENT "ASAN_OPTIONS=detect_leaks=1")
     endif()
+    ast_add_test(testlockcontention EXTRA_LIBS Threads::Threads)
 endif()
 
 # --- Grid smoke tests (no PLplot dependency) ---
